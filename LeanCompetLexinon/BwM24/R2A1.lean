@@ -111,7 +111,7 @@ end Proof
 
 section Result
 
-def solution : Set (Int × Int) := {(-1, 0)}
+def solution : Set (ℤ × ℤ) := {(-1, 0)}
 
 theorem proof : ∀ x y, equation x y ↔ (x, y) ∈ solution := by
   intros x y
