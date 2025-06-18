@@ -1,4 +1,7 @@
 import Mathlib.Data.Real.Basic
+import Mathlib.Data.Nat.Nth
+import Mathlib.Algebra.Order.Archimedean.Basic
+import Mathlib.Data.Real.Archimedean
 
 namespace BwM24R2A2
 
@@ -18,170 +21,51 @@ section Proof
 
 def ExampleSeqContains (n : ℕ) : Prop := ∃ m l, n = 2 ^ m * (4 * l + 1)
 
-lemma example_seq_infinite (n : ℕ) : ∃ m, n ≤ m ∧ ExampleSeqContains m := by
+lemma example_seq'_infinite : (setOf ExampleSeqContains).Infinite := by
+  apply Set.infinite_of_forall_exists_gt
+  intro n
   use 4 * n + 1
   constructor
-  · trans 4 * n
-    · apply Nat.le_mul_of_pos_left
-      simp
-    · simp
   · use 0, n
     simp
+  · calc n
+    _ ≤ 4 * n := by apply Nat.le_mul_of_pos_left; simp
+    _ < _ := by simp
 
 lemma example_seq_not_contains_zero : ¬ ExampleSeqContains 0 := by
   by_contra ha
   obtain ⟨n, m, ha⟩ := ha
   simp at ha
 
-instance decidableExampleSeqContains (n : ℕ) : Decidable (ExampleSeqContains n) := by
-  induction n using Nat.strongRec with
-  | ind n decInd =>
-    cases Nat.decEq n 0 with
-    | isTrue h_n_eq_zero =>
-      refine .isFalse ?_
-      rw [h_n_eq_zero]
-      exact example_seq_not_contains_zero
-    | isFalse h_n_ne_zero =>
-      cases Nat.decEq (n % 2) 0 with
-      | isTrue h_n_even =>
-        cases decInd (n / 2) (by exact Nat.bitwise_rec_lemma h_n_ne_zero) with
-        | isTrue h_ind =>
-          refine .isTrue ?_
-          rw [← Nat.div_add_mod n 2, h_n_even]
-          simp
-          sorry
-        | isFalse h_ind =>
-          refine .isFalse ?_
-          by_contra ha
-          sorry
-      | isFalse h_n_odd =>
-        cases Nat.decEq (n % 4) 1 with
-        | isTrue h_n_mod_four_eq_one =>
-          refine .isTrue ?_
-          rw [← Nat.div_add_mod n 4, h_n_mod_four_eq_one]
-          use 0, n / 4
-          simp
-        | isFalse h_n_mod_four_ne_one =>
-          refine .isFalse ?_
-          by_contra ha
-          obtain ⟨m, l, ha⟩ := ha
-          sorry
+noncomputable def exampleSeq' : ℕ → ℕ := Nat.nth ExampleSeqContains
 
 /-
-instance decidableExampleSeqContains (n : ℕ) : Decidable (ExampleSeqContains n) := by
-  induction n using Nat.strongRec with
-  | ind n decInd =>
-    cases Nat.decEq n 0 with
-    | isTrue h_n_eq_zero =>
-      refine .isFalse ?_
-      rw [h_n_eq_zero]
-      exact example_seq_not_contains_zero
-    | isFalse h_n_ne_zero =>
-      cases Nat.decEq (n % 2) 0 with
-      | isTrue h_n_even =>
-        cases decInd (n / 2) (by exact Nat.bitwise_rec_lemma h_n_ne_zero) with
-        | isTrue h_ind =>
-          refine .isTrue ?_
-          rw [← Nat.div_add_mod n 2, h_n_even]
-          simp
-          exact .double (n / 2) h_ind
-        | isFalse h_ind =>
-          refine .isFalse ?_
-          by_contra ha
-          cases ha with
-          | double n ha =>
-            rw [mul_comm, Nat.mul_div_cancel n (by simp)] at h_ind
-            absurd h_ind
-            exact ha
-          | mod n =>
-            rw [← Nat.mod_add_mod, show 4 = 2 * 2 by rfl, mul_assoc] at h_n_even
-            simp at h_n_even
-      | isFalse h_n_odd =>
-        cases Nat.decEq (n % 4) 1 with
-        | isTrue h_n_mod_four_eq_one =>
-          refine .isTrue ?_
-          rw [← Nat.div_add_mod n 4, h_n_mod_four_eq_one]
-          exact .mod _
-        | isFalse h_n_mod_four_ne_one =>
-          refine .isFalse ?_
-          by_contra ha
-          cases ha with
-          | double n ha =>
-            simp at h_n_odd
-          | mod n =>
-            simp at h_n_mod_four_ne_one
--/
-
-def exampleSeq (n : ℕ) : ℕ :=
-  let prev_add_one_or_zero := match n with
-  | 0 => 0
-  | n + 1 => exampleSeq n + 1
-  Nat.find (example_seq_infinite prev_add_one_or_zero)
-
-def exampleSeq' : ℕ → (List ℕ)
+def exampleSeq'' : ℕ → (List ℕ)
 | 0 => []
 | n + 1 => by
-  let xs := exampleSeq' n
+  let xs := exampleSeq'' n
   refine xs ++ [?_]
   match xs.getLast? with
   | none => exact Nat.find (example_seq_infinite 0)
   | some prev => exact Nat.find (example_seq_infinite (prev + 1))
+-/
 
 --#eval exampleSeq' 120
 
-lemma example_seq_contains (n : ℕ) : ExampleSeqContains (exampleSeq n) := by
-  let prev_add_one_or_zero := match n with
-  | 0 => 0
-  | m + 1 => exampleSeq m + 1
-  have h' := Nat.find_spec (example_seq_infinite prev_add_one_or_zero)
-  unfold exampleSeq
-  simp
-  exact h'.right
+lemma example_seq'_contains (n : ℕ) : ExampleSeqContains (exampleSeq' n) := by
+  apply Nat.nth_mem_of_infinite
+  exact example_seq'_infinite
 
-lemma example_seq_pos (n : ℕ) : 0 < exampleSeq n := by
+lemma example_seq'_pos (n : ℕ) : 0 < exampleSeq' n := by
   apply Nat.zero_lt_of_ne_zero
   by_contra ha
   absurd example_seq_not_contains_zero
   rw [← ha]
-  apply example_seq_contains n
+  apply example_seq'_contains n
 
-lemma example_seq_mono' (n : ℕ) : exampleSeq n < exampleSeq (n + 1) := by
-  rw [← add_lt_add_iff_right 1, ← Nat.le_iff_lt_add_one]
-  conv =>
-    rhs
-    unfold exampleSeq
-    simp
-  have h := Nat.find_spec (example_seq_infinite (exampleSeq n + 1))
-  exact h.left
-
-lemma example_seq_mono (n m : ℕ) (h : n < m) : exampleSeq n < exampleSeq m := by
-  induction m with
-  | zero =>
-    simp at h
-  | succ m h' =>
-    rw [← Nat.le_iff_lt_add_one] at h
-    cases eq_or_lt_of_le h with
-    | inl h =>
-      rw [← h]
-      exact example_seq_mono' n
-    | inr h =>
-      trans exampleSeq m
-      · apply h'
-        exact h
-      · exact example_seq_mono' m
-
-lemma example_seq_inj (n m : ℕ) (h : exampleSeq n = exampleSeq m) : n = m := by
-  by_contra ha
-  absurd h
-  cases lt_or_gt_of_ne ha with
-  | inl ha =>
-    apply ne_of_lt
-    apply example_seq_mono
-    exact ha
-  | inr ha =>
-    apply ne_of_gt
-    apply example_seq_mono
-    exact ha
+lemma example_seq'_inj : ∀ n m, exampleSeq' n = exampleSeq' m → n = m := by
+  apply Nat.nth_injective
+  exact example_seq'_infinite
 
 lemma two_pow_sub_even (n m : ℕ) (h : n < m) : 2 ^ (m - n) = 2 * 2 ^ (m - n - 1) := by
   have h : 0 < m - n := Nat.zero_lt_sub_of_lt h
@@ -244,11 +128,11 @@ lemma example_seq_no_sum_two_pow' (m₁ l₁ m₂ l₂ k : ℕ)
       simp
   exact ⟨hm, hl⟩
 
-lemma example_seq_no_sum_two_pow (n₁ n₂ k : ℕ) (h : exampleSeq n₁ + exampleSeq n₂ = 2 ^ k) :
+lemma example_seq_no_sum_two_pow (n₁ n₂ k : ℕ) (h : exampleSeq' n₁ + exampleSeq' n₂ = 2 ^ k) :
   n₁ = n₂ := by
-  obtain ⟨m₁, l₁, h₁⟩ := example_seq_contains n₁
-  obtain ⟨m₂, l₂, h₂⟩ := example_seq_contains n₂
-  apply example_seq_inj n₁ n₂
+  obtain ⟨m₁, l₁, h₁⟩ := example_seq'_contains n₁
+  obtain ⟨m₂, l₂, h₂⟩ := example_seq'_contains n₂
+  apply example_seq'_inj n₁ n₂
   rw [h₁, h₂] at h ⊢
   cases Nat.le_or_ge m₁ m₂ with
   | inl hm =>
@@ -258,6 +142,159 @@ lemma example_seq_no_sum_two_pow (n₁ n₂ k : ℕ) (h : exampleSeq n₁ + exam
     rw [add_comm] at h
     have hml : m₂ = m₁ ∧ l₂ = l₁ := example_seq_no_sum_two_pow' m₂ l₂ m₁ l₁ k h hm
     rw [hml.left, hml.right]
+
+lemma lt_card_filter_of_card_filter_not_lt {n k : ℕ} {p : ℕ → Prop} [DecidablePred p]
+  (h : k + {m ∈ Finset.range n | ¬ p m}.card < n) : k < {m ∈ Finset.range n | p m}.card := by
+  rw [← Nat.lt_sub_iff_add_lt] at h
+  conv at h =>
+    rhs; left
+    rw [← Finset.card_range n]
+  rw [← Finset.card_sdiff (by simp), ← Finset.filter_not] at h
+  simp at h
+  exact h
+
+lemma example_seq_lt (n : ℕ) : exampleSeq' n < 2 * (n + 1) := by
+  apply @Nat.nth_lt_of_lt_count _ sorry
+  rw [Nat.count_eq_card_filter_range]
+  have t : DecidablePred ExampleSeqContains := Classical.decPred ExampleSeqContains
+  have h : n + {m ∈ Finset.range (2 * (n + 1)) | ExampleSeqContains m}.card < 2 * (n + 1) := sorry
+  --rw [Finset.filter_de]
+  --apply @lt_card_filter_of_card_filter_not_lt (2 * (n + 1)) n ExampleSeqContains sorry
+  by_contra ha
+  simp at ha
+
+  /-
+  apply @Nat.nth_lt_of_lt_count _ sorry
+  by_contra ha
+  simp at ha
+  rw [Nat.count_eq_card_filter_range, ← Finset.card_range n] at ha
+  -/
+  sorry
+
+lemma exists_k_of_r_lt_two {r : ℝ} (hr : r < 2) {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) :
+  ∃ k, ∀ n ≤ 2 ^ k, seq n < 2 ^ (k + 1) := by
+  let ⟨k, hk⟩ := exists_nat_gt (2 / (2 - r))
+  use k
+  intros n hn
+  cases hn.lt_or_eq with
+  | inl hn =>
+    rw [← @Nat.cast_lt ℝ]
+    calc (seq n : ℝ)
+      _ < r * (n + 1 : ℕ) := h_seq.lt n
+      _ < 2 * (n + 1 : ℕ) := by
+        refine (mul_lt_mul_iff_of_pos_right ?_).mpr hr
+        rw [show (0 : ℝ) = (0 : ℕ) by simp, Nat.cast_lt]
+        simp
+      _ = (2 * (n + 1) : ℕ) := by simp
+      _ ≤ (2 ^ (k + 1) : ℕ) := by rw [Nat.cast_le, Nat.pow_add_one']; simp; exact hn.nat_succ_le
+  | inr hn =>
+    have hk : 2 / (2 - r) < (2 ^ k + 1 : ℕ) := by
+      calc 2 / (2 - r)
+        _ < (k : ℕ) := hk
+        _ < (2 ^ k : ℕ) := by rw [Nat.cast_lt]; exact Nat.lt_two_pow_self
+        _ < (2 ^ k + 1 : ℕ) := by rw [Nat.cast_lt]; simp
+    conv at hk =>
+      rw [div_lt_iff₀ (by rw [sub_pos]; exact hr), sub_eq_add_neg, Distrib.left_distrib]
+      rw [show (2 : ℝ) = (2 : ℕ) by simp, ← Nat.cast_mul, Distrib.right_distrib]
+      rw [← Nat.pow_add_one, mul_neg, ← sub_eq_add_neg, lt_sub_iff_add_lt]
+      rw [add_comm, ← lt_sub_iff_add_lt, ← Nat.cast_sub (by simp), mul_comm]
+    rw [hn]
+    rw [← @Nat.cast_lt ℝ]
+    calc (seq (2 ^ k) : ℝ)
+      _ < r * (2 ^ k + 1 : ℕ) := h_seq.lt (2 ^ k)
+      _ < (2 ^ (k + 1) : ℕ) := hk
+
+def mirrorSeq (seq : ℕ → ℕ) (k n : ℕ) : ℕ :=
+  let m := seq n; (if m ≤ 2 ^ k then m else 2 ^ (k + 1) - m) - 1
+
+lemma mirror_seq_lt_two_pow_k {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) {k n : ℕ} :
+  mirrorSeq seq k n < 2 ^ k := by
+  unfold mirrorSeq
+  simp
+  split_ifs with hn
+  · apply Nat.sub_one_lt_of_le
+    · exact h_seq.pos n
+    · exact hn
+  · rw [← Nat.add_sub_cancel (2 ^ k) (2 ^ k), ← two_mul, ← Nat.pow_add_one', Nat.sub_sub]
+    apply Nat.sub_lt_sub_left
+    · rw [Nat.pow_add_one']
+      simp
+    · rw [Nat.lt_add_one_iff]
+      apply Nat.le_of_lt
+      simp at hn
+      exact hn
+
+lemma mirror_seq_cancel_one {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) {k n : ℕ}
+  (h : seq n < 2 ^ (k + 1)) :
+  mirrorSeq seq k n + 1 = let m := seq n; if m ≤ 2 ^ k then m else 2 ^ (k + 1) - m := by
+  unfold mirrorSeq
+  simp
+  apply Nat.sub_one_add_one
+  rw [Nat.ne_zero_iff_zero_lt]
+  split_ifs
+  · exact h_seq.pos n
+  · apply Nat.zero_lt_sub_of_lt
+    exact h
+
+lemma lt_pigeon_hole (a b : ℕ) (f : ℕ → ℕ) (h₁ : a ≤ b) (h₂ : ∀ c ≤ b, f c < a) :
+  ∃ n ≤ b, ∃ m ≤ b, n ≠ m ∧ f n = f m := by
+  rw [Nat.le_iff_lt_add_one] at h₁
+  let pigeonHoles := Finset.range a
+  let pigeons := Finset.range (b + 1)
+  let ⟨n, hn, m, hm, n_ne_m, f_n_eq_f_m⟩ : ∃ n ∈ pigeons, ∃ m ∈ pigeons, n ≠ m ∧ f n = f m := by
+    apply @Finset.exists_ne_map_eq_of_card_lt_of_maps_to _ _ _ pigeonHoles
+    · rw [Finset.card_range, Finset.card_range]
+      exact h₁
+    · intros n hn
+      rw [Finset.mem_range]
+      apply h₂
+      rw [Nat.le_iff_lt_add_one, ← Finset.mem_range]
+      exact hn
+  rw [Finset.mem_range, ← Nat.le_iff_lt_add_one] at hn hm
+  use n
+  refine ⟨hn, ?_⟩
+  use m
+
+lemma contra_of_sum_two_pow {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) {k n m : ℕ}
+  (h₁ : seq m < 2 ^ (k + 1)) (h₂ : n ≠ m) (h₃ : seq n = 2 ^ (k + 1) - seq m) : False := by
+  absurd h_seq.no_sum_two_pow n m (k + 1)
+  simp
+  refine ⟨?_, h₂⟩
+  symm
+  apply Nat.eq_add_of_sub_eq
+  · exact h₁.le
+  · exact h₃.symm
+
+lemma not_exists_k {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) :
+  ¬ ∃ k, ∀ n ≤ 2 ^ k, seq n < 2 ^ (k + 1) := by
+  by_contra ha
+  obtain ⟨k, hk⟩ := ha
+  let mSeq := mirrorSeq seq k
+  let ⟨n, hn, m, hm, n_ne_m, pair_n_m⟩ : ∃ n ≤ 2 ^ k, ∃ m ≤ 2 ^ k, n ≠ m ∧ mSeq n = mSeq m := by
+    apply lt_pigeon_hole (2 ^ k) (2 ^ k) mSeq
+    · simp
+    · intros n _
+      exact mirror_seq_lt_two_pow_k h_seq
+  conv at pair_n_m =>
+    rw [← Nat.add_one_inj]
+    unfold mSeq
+    rw [mirror_seq_cancel_one h_seq (hk n hn), mirror_seq_cancel_one h_seq (hk m hm)]
+    simp
+  split_ifs at pair_n_m
+  · absurd h_seq.inj n m
+    simp
+    exact ⟨pair_n_m, n_ne_m⟩
+  · exact contra_of_sum_two_pow h_seq (hk m hm) n_ne_m pair_n_m
+  · exact contra_of_sum_two_pow h_seq (hk n hn) n_ne_m.symm pair_n_m.symm
+  · absurd h_seq.inj n m
+    conv at pair_n_m =>
+      rw [Nat.sub_eq_iff_eq_add (by apply le_of_lt; apply hk; exact hn)]
+      rw [← Nat.sub_add_comm (by apply le_of_lt; apply hk; exact hm)]
+      rw [Eq.comm]
+      rw [Nat.sub_eq_iff_eq_add (by apply Nat.le_add_right_of_le; apply le_of_lt; apply hk; exact hm)]
+      simp
+    simp
+    refine ⟨pair_n_m, n_ne_m⟩
 
 end Proof
 
@@ -271,13 +308,20 @@ theorem proof : ∀ r, r ∈ solution ↔ ∃ seq, IsRSeq r seq := by
   intro r
   constructor
   · intro hr
-    use exampleSeq
+    use exampleSeq'
     constructor
-    · exact example_seq_pos
-    · exact example_seq_inj
+    · exact example_seq'_pos
+    · exact example_seq'_inj
     · exact example_seq_no_sum_two_pow
     · sorry
-  · sorry
+      --exact example_seq_lt
+  · intro h_seq
+    obtain ⟨seq, h_seq⟩ := h_seq
+    by_contra ha
+    apply not_exists_k h_seq
+    unfold solution at ha
+    simp at ha
+    exact exists_k_of_r_lt_two ha h_seq
 
 end Result
 
