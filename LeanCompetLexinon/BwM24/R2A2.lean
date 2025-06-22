@@ -2,6 +2,8 @@ import Mathlib.Data.Real.Basic
 import Mathlib.Data.Nat.Nth
 import Mathlib.Algebra.Order.Archimedean.Basic
 import Mathlib.Data.Real.Archimedean
+import Mathlib.Data.Finset.Filter
+import Mathlib.Data.Finset.Card
 
 namespace BwM24R2A2
 
@@ -19,25 +21,158 @@ end Problem
 
 section Proof
 
-def ExampleSeqContains (n : ℕ) : Prop := ∃ m l, n = 2 ^ m * (4 * l + 1)
+open Finset
+
+def destruct (n : ℕ) : ℕ × ℕ :=
+  let m := Nat.findGreatest (2 ^ · ∣ n) n
+  let l := (n / 2 ^ m - 1) / 2
+  (m, l)
+
+lemma destruct_spec (n : ℕ) (hn : n ≠ 0) : n = 2 ^ (destruct n).1 * (2 * (destruct n).2 + 1) := by
+  unfold destruct
+  simp
+  generalize hm : Nat.findGreatest (2 ^ · ∣ n) n = m
+  have dvd_n : 2 ^ m ∣ n := by
+    rw [← hm]
+    exact @Nat.findGreatest_spec 0 (2 ^ · ∣ n) _ _ (by simp) (by simp)
+  have two_dvd : 2 ∣ (n / 2 ^ m - 1) := by
+    apply Nat.dvd_of_mod_eq_zero
+    apply Nat.sub_mod_eq_zero_of_mod_eq
+    rw [← Nat.mod_two_ne_zero]
+    rw [ne_eq, ← Nat.dvd_iff_mod_eq_zero, Nat.dvd_div_iff_mul_dvd dvd_n, ← Nat.pow_add_one]
+    apply @Nat.findGreatest_is_greatest (m + 1) (2 ^ · ∣ n) _ n
+    · rw [hm]
+      simp
+    · calc m + 1
+        _ ≤ 2 ^ m := by rw [Nat.add_one_le_iff]; exact Nat.lt_two_pow_self
+      apply Nat.le_of_dvd
+      · apply Nat.zero_lt_of_ne_zero
+        exact hn
+      · exact dvd_n
+  have div_ne_zero : n / 2 ^ m ≠ 0 := by
+    rw [Nat.div_ne_zero_iff_of_dvd dvd_n]
+    exact ⟨hn, by simp⟩
+  rw [Nat.mul_div_cancel' two_dvd, Nat.sub_one_add_one div_ne_zero, Nat.mul_div_cancel' dvd_n]
+
+lemma destruct_inj' {m₁ l₁ m₂ l₂ : ℕ} (h : 2 ^ m₁ * (2 * l₁ + 1) = 2 ^ m₂ * (2 * l₂ + 1))
+  (hm : m₁ ≤ m₂) : m₁ = m₂ ∧ l₁ = l₂ := by
+  conv at h =>
+    rw [← Nat.sub_add_cancel hm, pow_add]
+    conv =>
+      rhs; left
+      rw [mul_comm]
+    rw [mul_assoc]
+    simp
+  have dings : m₁ = m₂ := by
+    by_contra ha
+    have ha := lt_of_le_of_ne hm ha
+    absurd show Odd (2 * l₁ + 1) by simp
+    rw [h]
+    simp
+    rw [Nat.even_mul]
+    apply Or.inl
+    rw [Nat.even_pow]
+    simp
+    apply Nat.sub_ne_zero_of_lt
+    exact ha
+  have other_dings : l₁ = l₂ := by
+    rw [dings] at h
+    simp at h
+    exact h
+  exact ⟨dings, other_dings⟩
+
+lemma destruct_inj {m₁ l₁ m₂ l₂ : ℕ} (h : 2 ^ m₁ * (2 * l₁ + 1) = 2 ^ m₂ * (2 * l₂ + 1)) :
+  m₁ = m₂ ∧ l₁ = l₂ := by
+  cases Nat.le_or_ge m₁ m₂ with
+  | inl hm =>
+    exact destruct_inj' h hm
+  | inr hm =>
+    rw [eq_comm] at h ⊢
+    conv => right; rw [eq_comm]
+    exact destruct_inj' h hm
+
+lemma destruct_dings' (m l : ℕ) : let n := 2 ^ m * (2 * l + 1);
+  Nat.findGreatest (2 ^ · ∣ n) n = m := by
+  apply eq_of_le_of_le
+  · generalize hm' : Nat.findGreatest (2 ^ · ∣ 2 ^ m * (2 * l + 1)) (2 ^ m * (2 * l + 1)) = m'
+    rw [Nat.findGreatest_eq_iff] at hm'
+    by_contra ha
+    simp at ha
+    absurd show 2 ^ m' ∣ 2 ^ m * (2 * l + 1) by
+      apply hm'.right.left
+      exact Nat.ne_zero_of_lt ha
+    by_contra ha'
+    have ⟨q, ha'⟩ := ha'
+    rw [← Nat.sub_add_cancel ha.le, pow_add] at ha'
+    rw (config := { occs := .pos [4] }) [mul_comm] at ha'
+    rw [mul_assoc] at ha'
+    simp at ha'
+    absurd show Odd (2 * l + 1) by simp
+    rw [ha']
+    simp
+    rw [Nat.even_mul]
+    apply Or.inl
+    rw [Nat.even_pow]
+    refine ⟨by simp, ?_⟩
+    rw [Nat.sub_ne_zero_iff_lt]
+    exact ha
+  · apply Nat.le_findGreatest
+    · calc
+        _ ≤ 2 ^ m := by apply le_of_lt; exact Nat.lt_two_pow_self
+        _ ≤ 2 ^ m * (2 * l + 1) := by simp
+    · simp
+
+lemma destruct_dings (m l : ℕ) : destruct (2 ^ m * (2 * l + 1)) = (m, l) := by
+  unfold destruct
+  rw [destruct_dings' m l]
+  simp
+
+lemma destruct_two_pow {m : ℕ} : destruct (2 ^ m) = (m, 0) := by
+  rw [show 2 ^ m = 2 ^ m * (2 * 0 + 1) by simp, destruct_dings]
+
+def ExampleSeqContains (n : ℕ) : Prop := n ≠ 0 ∧ 2 ∣ (destruct n).2
+
+instance decidableExampleSeqContains : DecidablePred ExampleSeqContains := by
+  intro n
+  by_cases h : n ≠ 0
+  · by_cases h' : 2 ∣ (destruct n).2
+    · refine .isTrue ?_
+      exact ⟨h, h'⟩
+    · refine .isFalse ?_
+      apply not_and_of_not_right
+      exact h'
+  · refine .isFalse ?_
+    apply not_and_of_not_left
+    exact h
+
+def ExampleSeqContains' (n : ℕ) : Prop := ∃ m l, n = 2 ^ m * (4 * l + 1)
+
+lemma example_seq'_contains_gt (n : ℕ) : ∃ m ∈ setOf ExampleSeqContains, n < m := by
+  use 2 ^ n
+  refine ⟨?_, Nat.lt_two_pow_self⟩
+  unfold ExampleSeqContains
+  simp
+  rw [show 2 ^ n = 2 ^ n * (2 * 0 + 1) by simp, destruct_dings]
+  simp
 
 lemma example_seq'_infinite : (setOf ExampleSeqContains).Infinite := by
   apply Set.infinite_of_forall_exists_gt
-  intro n
-  use 4 * n + 1
-  constructor
-  · use 0, n
-    simp
-  · calc n
-    _ ≤ 4 * n := by apply Nat.le_mul_of_pos_left; simp
-    _ < _ := by simp
+  exact example_seq'_contains_gt
 
 lemma example_seq_not_contains_zero : ¬ ExampleSeqContains 0 := by
-  by_contra ha
-  obtain ⟨n, m, ha⟩ := ha
-  simp at ha
+  unfold ExampleSeqContains
+  simp
 
 noncomputable def exampleSeq' : ℕ → ℕ := Nat.nth ExampleSeqContains
+
+def exampleSeq'' : ℕ → List ℕ
+| 0 => []
+| 1 => [Nat.find (show ∃ n, ExampleSeqContains n by use 1; decide)]
+| n + 2 =>
+  let xs := exampleSeq'' (n + 1)
+  match xs.getLast? with
+  | some m => xs ++ [Nat.find (example_seq'_contains_gt m)]
+  | none => []
 
 /-
 def exampleSeq'' : ℕ → (List ℕ)
@@ -52,16 +187,26 @@ def exampleSeq'' : ℕ → (List ℕ)
 
 --#eval exampleSeq' 120
 
-lemma example_seq'_contains (n : ℕ) : ExampleSeqContains (exampleSeq' n) := by
+lemma example_seq'_contains (n : ℕ) : ∃ m l, exampleSeq' n = 2 ^ m * (4 * l + 1) := by
+  generalize hm : (destruct (exampleSeq' n)).1 = m
+  generalize hl : (destruct (exampleSeq' n)).2 = l
+  use m, l / 2
+  have h : ExampleSeqContains (exampleSeq' n) := by
+    apply Nat.nth_mem_of_infinite
+    exact example_seq'_infinite
+  rw [show 4 = 2 * 2 by rfl, mul_assoc, ← hm, ← hl, Nat.mul_div_cancel' h.right]
+  apply destruct_spec
+  exact h.left
+
+lemma example_seq'_contains' (n : ℕ) : ExampleSeqContains (exampleSeq' n) := by
   apply Nat.nth_mem_of_infinite
   exact example_seq'_infinite
 
 lemma example_seq'_pos (n : ℕ) : 0 < exampleSeq' n := by
   apply Nat.zero_lt_of_ne_zero
-  by_contra ha
-  absurd example_seq_not_contains_zero
-  rw [← ha]
-  apply example_seq'_contains n
+  let ⟨m, l, h⟩ := example_seq'_contains n
+  rw [h]
+  simp
 
 lemma example_seq'_inj : ∀ n m, exampleSeq' n = exampleSeq' m → n = m := by
   apply Nat.nth_injective
@@ -130,9 +275,9 @@ lemma example_seq_no_sum_two_pow' (m₁ l₁ m₂ l₂ k : ℕ)
 
 lemma example_seq_no_sum_two_pow (n₁ n₂ k : ℕ) (h : exampleSeq' n₁ + exampleSeq' n₂ = 2 ^ k) :
   n₁ = n₂ := by
-  obtain ⟨m₁, l₁, h₁⟩ := example_seq'_contains n₁
-  obtain ⟨m₂, l₂, h₂⟩ := example_seq'_contains n₂
-  apply example_seq'_inj n₁ n₂
+  have ⟨m₁, l₁, h₁⟩ := example_seq'_contains n₁
+  have ⟨m₂, l₂, h₂⟩ := example_seq'_contains n₂
+  apply example_seq'_inj
   rw [h₁, h₂] at h ⊢
   cases Nat.le_or_ge m₁ m₂ with
   | inl hm =>
@@ -143,32 +288,171 @@ lemma example_seq_no_sum_two_pow (n₁ n₂ k : ℕ) (h : exampleSeq' n₁ + exa
     have hml : m₂ = m₁ ∧ l₂ = l₁ := example_seq_no_sum_two_pow' m₂ l₂ m₁ l₁ k h hm
     rw [hml.left, hml.right]
 
-lemma lt_card_filter_of_card_filter_not_lt {n k : ℕ} {p : ℕ → Prop} [DecidablePred p]
-  (h : k + {m ∈ Finset.range n | ¬ p m}.card < n) : k < {m ∈ Finset.range n | p m}.card := by
-  rw [← Nat.lt_sub_iff_add_lt] at h
-  conv at h =>
-    rhs; left
-    rw [← Finset.card_range n]
-  rw [← Finset.card_sdiff (by simp), ← Finset.filter_not] at h
-  simp at h
+lemma haha {n' : ℕ} (n : {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ¬ExampleSeqContains k}})
+  (h : n.val ≠ 0) : (destruct n.val).2 % 2 = 1 := by
+  have h' := n.property
+  rw [Finset.mem_filter] at h'
+  have h' := h'.right
+  unfold ExampleSeqContains at h'
+  simp at h'
+  apply h'
   exact h
 
-lemma example_seq_lt (n : ℕ) : exampleSeq' n < 2 * (n + 1) := by
+def floorToTwoPow (n : ℕ) : ℕ := Nat.findGreatest (2 ^ · ≤ n + 1) n
+
+lemma floor_to_two_pow_spec {n : ℕ} : 2 ^ floorToTwoPow n ≤ n + 1 := by
+  apply @Nat.findGreatest_spec 0 (2 ^ · ≤ n + 1)
+  · simp
+  · simp
+
+/-
+lemma floor_to_two_pow_spec₂ {n : ℕ} : n + 1 < 2 ^ (floorToTwoPow n + 1) := by
+  rw [lt_iff_not_le]
+  apply @Nat.findGreatest_is_greatest (floorToTwoPow n + 1) (2 ^ · ≤ n + 1) _ n
+  · apply Nat.lt_add_one
+  · sorry
+-/
+
+def matchNonMemberNeZeroWithMember {n' : ℕ}
+  (n : {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ¬ExampleSeqContains k}}) (h : n.val ≠ 0) :
+  {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ExampleSeqContains k}} := by
+  let m := (destruct n).1
+  let l := (destruct n).2
+  refine ⟨2 ^ m * (2 * (l - 1) + 1), ?_⟩
+  simp
+  constructor
+  · calc
+      _ < n.val := ?_
+      _ < 2 * (n' + 1) := ?_
+    · rw [destruct_spec n.val h]
+      unfold m l
+      by_contra ha
+      simp at ha
+      absurd show ¬ExampleSeqContains n.val by
+        have h' := n.property
+        rw [Finset.mem_filter] at h'
+        exact h'.right
+      refine ⟨h, ?_⟩
+      rw [ha]
+      simp
+    · rw [← Finset.mem_range]
+      apply @Finset.mem_of_mem_filter _ (fun k ↦ ¬ExampleSeqContains k) _ _ n.val
+      exact n.property
+  · unfold ExampleSeqContains
+    simp
+    rw [destruct_dings]
+    simp
+    rw [Nat.dvd_iff_mod_eq_zero]
+    apply Nat.sub_mod_eq_zero_of_mod_eq
+    unfold l
+    exact haha n h
+
+def matchNonMemberWithMember {n' : ℕ}
+  (n : {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ¬ExampleSeqContains k}}) :
+  {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ExampleSeqContains k}} := by
+  by_cases h : n.val ≠ 0
+  · exact matchNonMemberNeZeroWithMember n h
+  · refine ⟨2 ^ floorToTwoPow n', ?_⟩
+    simp
+    constructor
+    · calc
+        _ ≤ n' + 1 := floor_to_two_pow_spec
+        _ < 2 * (n' + 1) := by simp
+    · refine ⟨by simp, ?_⟩
+      rw [destruct_two_pow]
+      simp
+
+lemma example_seq_lt (n' : ℕ) : exampleSeq' n' < 2 * (n' + 1) := by
+  apply Nat.nth_lt_of_lt_count
+  rw [Nat.count_eq_card_filter_range, ← Nat.add_one_le_iff]
+  rw [← mul_le_mul_left (show 0 < 2 by simp)]
+  conv =>
+    lhs;
+    rw (config := { occs := .pos [1] }) [← Finset.card_range (2 * (n' + 1))]
+    rw [← @Finset.filter_card_add_filter_neg_card_eq_card _ _ ExampleSeqContains]
+  rw (config := { occs := .pos [3] }) [two_mul]
+  simp
+  apply Finset.card_le_card_of_injective (show Function.Injective matchNonMemberWithMember from ?_)
+  intros n₁ n₂ h
+  apply Subtype.eq
+  unfold matchNonMemberWithMember matchNonMemberNeZeroWithMember at h
+  rw [Subtype.mk.injEq] at h
+  have h := congr_arg destruct h
+  split_ifs at h with hn₁ hn₂ hn₂
+  · rw [destruct_dings, destruct_dings] at h
+    simp at h
+    rw [destruct_spec n₁.val hn₁, destruct_spec n₂.val hn₂, ← h.left]
+    simp
+    calc
+      _ = (destruct n₁.val).2 - 1 + 1 := (Nat.sub_one_add_one ?_).symm
+      _ = (destruct n₂.val).2 - 1 + 1 := by rw [h.right]
+      _ = (destruct n₂.val).2 := (Nat.sub_one_add_one ?_)
+    · by_contra ha
+      absurd haha n₁ hn₁
+      rw [ha]
+      simp
+    · by_contra ha
+      absurd haha n₂ hn₂
+      rw [ha]
+      simp
+  · apply False.elim
+    absurd show n₁ < 2 * (n' + 1) by
+      have h' := n₁.property
+      rw [Finset.mem_filter, Finset.mem_range] at h'
+      exact h'.left
+    simp at h
+    rw [destruct_dings, destruct_two_pow] at h
+    simp at h
+    rw [destruct_spec n₁.val hn₁, h.left]
+    sorry
+  · sorry
+  · simp at hn₁ hn₂
+    rw [hn₁, hn₂]
+  /-
+  conv =>
+    rhs; right; left; ext n'
+    rw [← @not_not (ExampleSeqContains n')]
+  rw [Finset.filter_not, Finset.card_sdiff (by simp)]
+  -/
+  /-
+  rw [Finset.filter_congr _ (ExampleSeqContains ·) (ExampleSeqContains ·) sorry sorry (Finset.range (2 * (n + 1)))]
+  conv =>
+    rhs; right; congr
+    · ext n'
+      rw [← @not_not (ExampleSeqContains n')]
+    · skip
+    · exact sorry
+  -/
+  --rw [@Finset.filter_not _ (¬ ExampleSeqContains ·) sorry _ (Finset.range (2 * (n + 1)))]
+  /-
+  have _ : DecidablePred ExampleSeqContains := sorry
+  let d := {x ∈ Finset.range (2 * (n + 1)) | ¬ ExampleSeqContains x}
+  generalize he : {x ∈ Finset.range (2 * (n + 1)) | ExampleSeqContains x} = e
+  -/
+  /-
   apply @Nat.nth_lt_of_lt_count _ sorry
   rw [Nat.count_eq_card_filter_range]
   have t : DecidablePred ExampleSeqContains := Classical.decPred ExampleSeqContains
   have h : n + {m ∈ Finset.range (2 * (n + 1)) | ExampleSeqContains m}.card < 2 * (n + 1) := sorry
+  -/
   --rw [Finset.filter_de]
   --apply @lt_card_filter_of_card_filter_not_lt (2 * (n + 1)) n ExampleSeqContains sorry
-  by_contra ha
-  simp at ha
-
   /-
   apply @Nat.nth_lt_of_lt_count _ sorry
   by_contra ha
   simp at ha
   rw [Nat.count_eq_card_filter_range, ← Finset.card_range n] at ha
   -/
+  --sorry
+
+lemma example_seq_lt' (n' : ℕ) : exampleSeq' n' < 2 * (n' + 1) := by
+  apply Nat.nth_lt_of_lt_count
+  rw [Nat.count_eq_card_filter_range]
+  have t : exampleSeq' n' - n' ≤ #{n ∈ Finset.range (exampleSeq' n') | ExampleSeqContains n} := by
+    sorry
+  have s : n' = #{n ∈ Finset.range (exampleSeq' n') | ExampleSeqContains n} := by
+    sorry
+
   sorry
 
 lemma exists_k_of_r_lt_two {r : ℝ} (hr : r < 2) {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) :
@@ -313,8 +597,13 @@ theorem proof : ∀ r, r ∈ solution ↔ ∃ seq, IsRSeq r seq := by
     · exact example_seq'_pos
     · exact example_seq'_inj
     · exact example_seq_no_sum_two_pow
-    · sorry
-      --exact example_seq_lt
+    · intro n
+      calc (exampleSeq' n : ℝ)
+        _ < (2 * (n + 1) : ℕ) := by rw [Nat.cast_lt]; exact example_seq_lt n
+        _ = 2 * (n + 1 : ℕ) := by simp
+        _ ≤ r * (n + 1 : ℕ) := ?_
+      apply mul_le_mul_of_nonneg_right hr
+      exact Nat.cast_nonneg (n + 1)
   · intro h_seq
     obtain ⟨seq, h_seq⟩ := h_seq
     by_contra ha
