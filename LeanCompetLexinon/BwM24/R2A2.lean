@@ -288,15 +288,15 @@ lemma example_seq_no_sum_two_pow (n₁ n₂ k : ℕ) (h : exampleSeq' n₁ + exa
     have hml : m₂ = m₁ ∧ l₂ = l₁ := example_seq_no_sum_two_pow' m₂ l₂ m₁ l₁ k h hm
     rw [hml.left, hml.right]
 
-lemma haha {n' : ℕ} (n : {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ¬ExampleSeqContains k}})
-  (h : n.val ≠ 0) : (destruct n.val).2 % 2 = 1 := by
-  have h' := n.property
-  rw [Finset.mem_filter] at h'
-  have h' := h'.right
-  unfold ExampleSeqContains at h'
-  simp at h'
-  apply h'
-  exact h
+lemma haha {n' : ℕ}
+  (n : {k // k ∈ {k ∈ Finset.range (exampleSeq' n') | 0 ≠ k ∧ ¬ExampleSeqContains k}}) :
+  (destruct n.val).2 % 2 = 1 := by
+  have h := n.property
+  rw [Finset.mem_filter, ne_comm] at h
+  unfold ExampleSeqContains at h
+  simp at h
+  apply h.right.right
+  exact h.right.left
 
 def floorToTwoPow (n : ℕ) : ℕ := Nat.findGreatest (2 ^ · ≤ n + 1) n
 
@@ -313,9 +313,10 @@ lemma floor_to_two_pow_spec₂ {n : ℕ} : n + 1 < 2 ^ (floorToTwoPow n + 1) := 
   · sorry
 -/
 
+/-
 def matchNonMemberNeZeroWithMember {n' : ℕ}
-  (n : {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ¬ExampleSeqContains k}}) (h : n.val ≠ 0) :
-  {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ExampleSeqContains k}} := by
+  (n : {k // k ∈ {k ∈ Finset.range (exampleSeq' n') | ¬ExampleSeqContains k}}) (h : n.val ≠ 0) :
+  {k // k ∈ {k ∈ Finset.range (exampleSeq' n' + 1) | ExampleSeqContains k}} := by
   let m := (destruct n).1
   let l := (destruct n).2
   refine ⟨2 ^ m * (2 * (l - 1) + 1), ?_⟩
@@ -323,14 +324,15 @@ def matchNonMemberNeZeroWithMember {n' : ℕ}
   constructor
   · calc
       _ < n.val := ?_
-      _ < 2 * (n' + 1) := ?_
-    · rw [destruct_spec n.val h]
+      _ < exampleSeq' n' := ?_
+      _ < exampleSeq' n' + 1 := by simp
+    · rw [destruct_spec n h]
       unfold m l
       by_contra ha
       simp at ha
-      absurd show ¬ExampleSeqContains n.val by
+      absurd show ¬ExampleSeqContains n by
         have h' := n.property
-        rw [Finset.mem_filter] at h'
+        rw [mem_filter] at h'
         exact h'.right
       refine ⟨h, ?_⟩
       rw [ha]
@@ -345,23 +347,81 @@ def matchNonMemberNeZeroWithMember {n' : ℕ}
     rw [Nat.dvd_iff_mod_eq_zero]
     apply Nat.sub_mod_eq_zero_of_mod_eq
     unfold l
-    exact haha n h
+    --apply haha n
 
-def matchNonMemberWithMember {n' : ℕ}
-  (n : {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ¬ExampleSeqContains k}}) :
-  {k // k ∈ {k ∈ Finset.range (2 * (n' + 1)) | ExampleSeqContains k}} := by
+    sorry
+-/
+
+/-
+noncomputable def matchNonMemberWithMember {n' : ℕ}
+  (n : {k // k ∈ {k ∈ Finset.range (exampleSeq' n') | ¬ExampleSeqContains k}}) :
+  {k // k ∈ {k ∈ Finset.range (exampleSeq' n' + 1) | ExampleSeqContains k}} := by
   by_cases h : n.val ≠ 0
   · exact matchNonMemberNeZeroWithMember n h
-  · refine ⟨2 ^ floorToTwoPow n', ?_⟩
+  · refine ⟨exampleSeq' n', ?_⟩
     simp
-    constructor
-    · calc
-        _ ≤ n' + 1 := floor_to_two_pow_spec
-        _ < 2 * (n' + 1) := by simp
-    · refine ⟨by simp, ?_⟩
-      rw [destruct_two_pow]
-      simp
+    exact example_seq'_contains' n'
+-/
 
+def matchNonMemberWithMember' {n' : ℕ}
+  (n : {k // k ∈ {k ∈ Finset.range (exampleSeq' n') | 0 ≠ k ∧ ¬ExampleSeqContains k}}) :
+  {k // k ∈ {k ∈ Finset.range (exampleSeq' n') | 0 ≠ k ∧ ExampleSeqContains k}} := by
+  have h := n.property
+  rw [mem_filter, ne_comm] at h
+  let m := (destruct n).1
+  let l := (destruct n).2
+  refine ⟨2 ^ m * (2 * (l - 1) + 1), ?_⟩
+  simp
+  constructor
+  · calc
+      _ < n.val := ?_
+      _ < exampleSeq' n' := ?_
+    · rw [destruct_spec n h.right.left]
+      unfold m l
+      by_contra ha
+      simp at ha
+      absurd show ¬ExampleSeqContains n by
+        have h' := n.property
+        rw [mem_filter] at h'
+        exact h.right.right
+      refine ⟨h.right.left, ?_⟩
+      rw [ha]
+      simp
+    · rw [← Finset.mem_range]
+      exact h.left
+  · unfold ExampleSeqContains
+    simp
+    rw [destruct_dings]
+    simp
+    rw [Nat.dvd_iff_mod_eq_zero]
+    apply Nat.sub_mod_eq_zero_of_mod_eq
+    unfold l
+    apply haha n
+
+lemma ne_zero_of_mod_ne_zero {n : ℕ} (m : ℕ) (h : n % m ≠ 0) : n ≠ 0 := by
+  by_contra ha; rw [ha] at h; simp at h
+
+lemma injective_match_non_member_with_member' {n' : ℕ} :
+  Function.Injective (@matchNonMemberWithMember' n') := by
+  intros n₁ n₂ h
+  have hn₁ := n₁.prop
+  have hn₂ := n₂.prop
+  rw [mem_filter, ne_comm] at hn₁ hn₂
+  unfold matchNonMemberWithMember' at h
+  simp at h
+  have h := congr_arg destruct h
+  rw [destruct_dings, destruct_dings] at h
+  simp at h
+  apply Subtype.eq
+  rw [destruct_spec n₁ hn₁.right.left, destruct_spec n₂ hn₂.right.left, ← h.left]
+  simp
+  refine Nat.sub_one_cancel ?_ ?_ h.right
+  <;> rw [← Nat.ne_zero_iff_zero_lt]
+  <;> apply ne_zero_of_mod_ne_zero 2
+  <;> rw [Nat.mod_two_ne_zero]
+  <;> exact haha _
+
+/-
 lemma example_seq_lt (n' : ℕ) : exampleSeq' n' < 2 * (n' + 1) := by
   apply Nat.nth_lt_of_lt_count
   rw [Nat.count_eq_card_filter_range, ← Nat.add_one_le_iff]
@@ -444,16 +504,35 @@ lemma example_seq_lt (n' : ℕ) : exampleSeq' n' < 2 * (n' + 1) := by
   rw [Nat.count_eq_card_filter_range, ← Finset.card_range n] at ha
   -/
   --sorry
+-/
 
-lemma example_seq_lt' (n' : ℕ) : exampleSeq' n' < 2 * (n' + 1) := by
-  apply Nat.nth_lt_of_lt_count
-  rw [Nat.count_eq_card_filter_range]
-  have t : exampleSeq' n' - n' ≤ #{n ∈ Finset.range (exampleSeq' n') | ExampleSeqContains n} := by
-    sorry
-  have s : n' = #{n ∈ Finset.range (exampleSeq' n') | ExampleSeqContains n} := by
-    sorry
-
-  sorry
+lemma example_seq_lt (n' : ℕ) : exampleSeq' n' < 2 * (n' + 1) := by
+  have h : #{n ∈ Finset.range (exampleSeq' n') | 0 ≠ n ∧ ¬ExampleSeqContains n} ≤
+    #{n ∈ Finset.range (exampleSeq' n') | 0 ≠ n ∧ ExampleSeqContains n} := by
+    apply @card_le_card_of_injective _ _ _ _ matchNonMemberWithMember'
+    exact injective_match_non_member_with_member'
+  conv at h =>
+    rw [← Nat.add_one_le_add_one_iff]
+    conv =>
+      lhs
+      rw [filter_and, filter_ne, erase_inter, inter_filter, inter_self]
+      rw [card_erase_add_one (by simp; exact ⟨example_seq'_pos n', example_seq_not_contains_zero⟩)]
+      rw [filter_not, card_sdiff (by simp), card_range]
+      conv => right; unfold exampleSeq'
+    conv =>
+      rhs
+      conv =>
+        left; args; fun; args; ext n
+        rw [ne_comm]
+        unfold ExampleSeqContains
+        rw [and_self_left, show n ≠ 0 ∧ 2 ∣ (destruct n).2 ↔ ExampleSeqContains n by rfl]
+      unfold exampleSeq'
+    rw [← Nat.count_eq_card_filter_range]
+    rw [Nat.count_nth_of_infinite example_seq'_infinite]
+  rw [Distrib.left_distrib, two_mul 1, ← add_assoc, Nat.lt_add_one_iff]
+  rw [two_mul, add_assoc, add_comm]
+  apply Nat.le_add_of_sub_le
+  exact h
 
 lemma exists_k_of_r_lt_two {r : ℝ} (hr : r < 2) {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) :
   ∃ k, ∀ n ≤ 2 ^ k, seq n < 2 ^ (k + 1) := by
