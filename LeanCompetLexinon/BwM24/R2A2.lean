@@ -25,7 +25,7 @@ section Proof
 open Finset
 
 
-variable (n n₁ n₂ m l m₁ l₁ m₂ l₂ k : ℕ) {n' : ℕ}
+variable (n n₁ n₂ m l m₁ l₁ m₂ l₂ k : ℕ) {n' : ℕ} {r : ℝ} {seq : ℕ → ℕ}
 
 def decomp : ℕ × ℕ :=
   let m := Nat.findGreatest (2 ^ · ∣ n) n
@@ -166,14 +166,14 @@ lemma example_seq_no_sum_two_pow (h : exampleSeq n₁ + exampleSeq n₂ = 2 ^ k)
   rw [hl]
 
 lemma odd_of_mem
-    (n : {k // k ∈ {k ∈ Finset.range (exampleSeq n') | 0 ≠ k ∧ ¬ExampleSeqContains k}}) :
+    (n : {k // k ∈ {k ∈ range (exampleSeq n') | 0 ≠ k ∧ ¬ExampleSeqContains k}}) :
     (decomp n.val).2 % 2 = 1 := by
-  have h := n.property; rw [Finset.mem_filter, ne_comm] at h; unfold ExampleSeqContains at h
+  have h := n.property; rw [mem_filter, ne_comm] at h; unfold ExampleSeqContains at h
   simp at h; apply h.right.right; exact h.right.left
 
 def matchNonMemberWithMember
-    (n : {k // k ∈ {k ∈ Finset.range (exampleSeq n') | 0 ≠ k ∧ ¬ExampleSeqContains k}}) :
-    {k // k ∈ {k ∈ Finset.range (exampleSeq n') | 0 ≠ k ∧ ExampleSeqContains k}} := by
+    (n : {k // k ∈ {k ∈ range (exampleSeq n') | 0 ≠ k ∧ ¬ExampleSeqContains k}}) :
+    {k // k ∈ {k ∈ range (exampleSeq n') | 0 ≠ k ∧ ExampleSeqContains k}} := by
   let m := (decomp n).1; let l := (decomp n).2; refine ⟨2 ^ m * (2 * (l - 1) + 1), ?_⟩
   have h := n.property; rw [mem_filter, ne_comm] at h; simp; constructor
   · calc
@@ -183,11 +183,11 @@ def matchNonMemberWithMember
       absurd show ¬ExampleSeqContains n by
         have h' := n.property; rw [mem_filter] at h'; exact h.right.right
       refine ⟨h.right.left, ?_⟩; rw [ha]; simp
-    · rw [← Finset.mem_range]; exact h.left
+    · rw [← mem_range]; exact h.left
   · unfold ExampleSeqContains; simp; rw [decomp_recomp]; simp; rw [Nat.dvd_iff_mod_eq_zero]
     apply Nat.sub_mod_eq_zero_of_mod_eq; unfold l; apply odd_of_mem n
 
-lemma ne_zero_of_mod_ne_zero (n : ℕ) (m : ℕ) (h : n % m ≠ 0) : n ≠ 0 := by
+lemma ne_zero_of_mod_ne_zero (h : n % m ≠ 0) : n ≠ 0 := by
   by_contra ha; rw [ha] at h; simp at h
 
 lemma injective_match_non_member_with_member :
@@ -200,8 +200,8 @@ lemma injective_match_non_member_with_member :
   <;> apply ne_zero_of_mod_ne_zero _ 2 <;> rw [Nat.mod_two_ne_zero] <;> exact odd_of_mem _
 
 lemma example_seq_lt (n' : ℕ) : exampleSeq n' < 2 * (n' + 1) := by
-  have h : #{n ∈ Finset.range (exampleSeq n') | 0 ≠ n ∧ ¬ExampleSeqContains n} ≤
-    #{n ∈ Finset.range (exampleSeq n') | 0 ≠ n ∧ ExampleSeqContains n} := by
+  have h : #{n ∈ range (exampleSeq n') | 0 ≠ n ∧ ¬ExampleSeqContains n} ≤
+    #{n ∈ range (exampleSeq n') | 0 ≠ n ∧ ExampleSeqContains n} := by
     apply @card_le_card_of_injective _ _ _ _ matchNonMemberWithMember
     exact injective_match_non_member_with_member
   conv at h =>
@@ -219,7 +219,7 @@ lemma example_seq_lt (n' : ℕ) : exampleSeq n' < 2 * (n' + 1) := by
   rw [Distrib.left_distrib, two_mul 1, ← add_assoc, Nat.lt_add_one_iff]
   rw [two_mul, add_assoc, add_comm]; apply Nat.le_add_of_sub_le; exact h
 
-lemma exists_k_of_r_lt_two {r : ℝ} (hr : r < 2) {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) :
+lemma exists_k_of_r_lt_two (hr : r < 2) (h_seq : IsRSeq r seq) :
     ∃ k, ∀ n ≤ 2 ^ k, seq n < 2 ^ (k + 1) := by
   let ⟨k, hk⟩ := exists_nat_gt (2 / (2 - r)); use k; intros n hn; cases hn.lt_or_eq with
   | inl hn =>
@@ -257,35 +257,33 @@ lemma mirror_seq_lt_two_pow_k {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r se
     · rw [Nat.pow_add_one']; simp
     · rw [Nat.lt_add_one_iff]; apply Nat.le_of_lt; simp at hn; exact hn
 
-lemma mirror_seq_cancel_one {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) {k n : ℕ}
-    (h : seq n < 2 ^ (k + 1)) :
+lemma mirror_seq_cancel_one (h_seq : IsRSeq r seq) {k n : ℕ} (h : seq n < 2 ^ (k + 1)) :
     mirrorSeq seq k n + 1 = let m := seq n; if m ≤ 2 ^ k then m else 2 ^ (k + 1) - m := by
   unfold mirrorSeq; simp; apply Nat.sub_one_add_one; rw [Nat.ne_zero_iff_zero_lt]; split_ifs
   · exact h_seq.pos n
   · apply Nat.zero_lt_sub_of_lt
     exact h
 
-lemma lt_pigeon_hole (a b : ℕ) (f : ℕ → ℕ) (h₁ : a ≤ b) (h₂ : ∀ c ≤ b, f c < a) :
-    ∃ n ≤ b, ∃ m ≤ b, n ≠ m ∧ f n = f m := by
+lemma lt_pigeon_hole (a b : ℕ) (h₁ : a ≤ b) (h₂ : ∀ c ≤ b, seq c < a) :
+    ∃ n ≤ b, ∃ m ≤ b, n ≠ m ∧ seq n = seq m := by
   rw [Nat.le_iff_lt_add_one] at h₁
-  let pigeonHoles := Finset.range a; let pigeons := Finset.range (b + 1)
-  let ⟨n, hn, m, hm, n_ne_m, f_n_eq_f_m⟩ : ∃ n ∈ pigeons, ∃ m ∈ pigeons, n ≠ m ∧ f n = f m := by
-    apply @Finset.exists_ne_map_eq_of_card_lt_of_maps_to _ _ _ pigeonHoles
-    · rw [Finset.card_range, Finset.card_range]; exact h₁
-    · intros n hn; rw [Finset.mem_range]; apply h₂; rw [Nat.le_iff_lt_add_one, ← Finset.mem_range]
+  let pigeonHoles := range a; let pigeons := range (b + 1)
+  let ⟨n, hn, m, hm, n_ne_m, f_n_eq_f_m⟩ : ∃ n ∈ pigeons, ∃ m ∈ pigeons, n ≠ m ∧ seq n = seq m := by
+    apply @exists_ne_map_eq_of_card_lt_of_maps_to _ _ _ pigeonHoles
+    · rw [card_range, card_range]; exact h₁
+    · intros n hn; rw [mem_range]; apply h₂; rw [Nat.le_iff_lt_add_one, ← mem_range]
       exact hn
-  rw [Finset.mem_range, ← Nat.le_iff_lt_add_one] at hn hm; use n; refine ⟨hn, ?_⟩; use m
+  rw [mem_range, ← Nat.le_iff_lt_add_one] at hn hm; use n; refine ⟨hn, ?_⟩; use m
 
-lemma contra_of_sum_two_pow {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) {k n m : ℕ}
+lemma contra_of_sum_two_pow (h_seq : IsRSeq r seq) {k n m : ℕ}
     (h₁ : seq m < 2 ^ (k + 1)) (h₂ : n ≠ m) (h₃ : seq n = 2 ^ (k + 1) - seq m) : False := by
   absurd h_seq.no_sum_two_pow n m (k + 1); simp; refine ⟨?_, h₂⟩; rw [eq_comm]
   exact Nat.eq_add_of_sub_eq h₁.le h₃.symm
 
-lemma not_exists_k {r : ℝ} {seq : ℕ → ℕ} (h_seq : IsRSeq r seq) :
-    ¬ ∃ k, ∀ n ≤ 2 ^ k, seq n < 2 ^ (k + 1) := by
+lemma not_exists_k (h_seq : IsRSeq r seq) : ¬ ∃ k, ∀ n ≤ 2 ^ k, seq n < 2 ^ (k + 1) := by
   by_contra ha; obtain ⟨k, hk⟩ := ha; let mSeq := mirrorSeq seq k
   let ⟨n, hn, m, hm, n_ne_m, pair_n_m⟩ : ∃ n ≤ 2 ^ k, ∃ m ≤ 2 ^ k, n ≠ m ∧ mSeq n = mSeq m := by
-    apply lt_pigeon_hole (2 ^ k) (2 ^ k) mSeq (by simp); intros n _;
+    apply lt_pigeon_hole (2 ^ k) (2 ^ k) (by simp); intros n _;
     exact mirror_seq_lt_two_pow_k h_seq
   conv at pair_n_m =>
     rw [← Nat.add_one_inj]; unfold mSeq
