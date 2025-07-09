@@ -13,16 +13,24 @@ import Mathlib.Data.Finset.Insert
 
 section Problem
 
-abbrev Country : ℕ → Type := Fin
+abbrev City : ℕ → Type := Fin
 
+/-- A flight schedule defining for each two cities whether they are connected (without any
+restrictions yet). -/
 structure FlightSchedule (k : ℕ) where
-  connected : Country k → Country k → Prop
-  irrefl : ∀ city, ¬connected city city
-  symm : ∀ city1 city2, connected city1 city2 → connected city2 city1
-  not_exists_global_hub : ¬∃ hub, ∀ city, hub = city ∨ connected hub city
+  connected : City k → City k → Prop
 
+/-- The flight schedule is valid, i. e. no city is connected to itself, the connections are
+symmetric and there is no global hub connected to all other cities. -/
+structure IsValidFlightSchedule {k : ℕ} (fs : FlightSchedule k) : Prop where
+  irrefl : ∀ city, ¬fs.connected city city
+  symm : ∀ city1 city2, fs.connected city1 city2 → fs.connected city2 city1
+  not_exists_global_hub : ¬∃ hub, ∀ city, hub = city ∨ fs.connected hub city
+
+/-- For any `n` cities there is a hub connected to all selected cities in the given flightSchedule
+(`fs`). -/
 def ExistHubs {k : ℕ} (n : ℕ) (fs : FlightSchedule k) : Prop :=
-  ∀ cities : Finset (Country k), cities.card = n → ∃ hub, ∀ city ∈ cities,
+  ∀ cities : Finset (City k), cities.card = n → ∃ hub, ∀ city ∈ cities,
   fs.connected hub city
 
 end Problem
@@ -33,91 +41,99 @@ section Proof
 
 open Finset
 
-variable {k : ℕ} [NeZero k] (cities : Finset (Country (2 * k)))
+section ExistsFlightSchedule
+
+variable {k : ℕ} [NeZero k] {selectedCities : Finset (City (2 * k))} {hub : City (2 * k)}
 
 lemma ne_zero_of_odd {n : ℕ} (h : Odd n) : n ≠ 0 := by
   by_contra ha; rw [Nat.odd_iff, ha] at h; simp at h
 
-def IsConnectedInPairedFlightSchedule {k : ℕ} (a b : Country (2 * k)) : Prop := a.val / 2 ≠ b.val / 2
+/-- A flight schedule where two different cities are not connected if and only if they are
+assigned numbers where the greater number is odd and the successor of the other number. -/
+def pairedFlightSchedule {k : ℕ} : FlightSchedule (2 * k) :=
+  ⟨fun city₁ city₂ ↦ city₁.val / 2 ≠ city₂.val / 2⟩
 
-/-- If a global hub exists in the `pairedFlightSchedule`, it must be assigned an even number. -/
-lemma even_global_hub {k : ℕ} [NeZero k] {hub : Country (2 * k)}
-    (h : ∀ (city : Country (2 * k)), hub = city ∨ IsConnectedInPairedFlightSchedule hub city) :
-    Even hub.val := by
-  by_contra ha
-  rw [Nat.not_even_iff_odd] at ha
-  absurd h (hub - 1 : ℕ)
-  have cast_val_eq : ((hub.val - 1 : ℕ) : Country (2 * k)).val = hub.val - 1 := by
+/-- In the `pairedFlightSchedule`, a city that is assigned an even number is not connected to
+one other city (its successor). -/
+lemma exists_city_of_even_hub (h_hub : Even hub.val) :
+    ∃ city, hub ≠ city ∧ ¬pairedFlightSchedule.connected hub city := by
+  use (hub.val + 1 : ℕ)
+  have cast_val_eq : ((hub.val + 1 : ℕ) : City (2 * k)).val = hub.val + 1 := by
     apply Fin.val_cast_of_lt
-    calc
-      _ ≤ hub.val := by simp
-      _ < 2 * k := Fin.prop hub
-  simp
-  constructor
-  · apply Fin.ne_of_val_ne
-    rw [cast_val_eq, ne_comm]
-    apply Nat.sub_one_ne_self
-    exact ne_zero_of_odd ha
-  · unfold IsConnectedInPairedFlightSchedule
-    rw [ne_eq, not_not, ← Nat.mul_right_inj (show 2 ≠ 0 by simp), ← Nat.add_one_inj]
-    rw [Nat.two_mul_div_two_add_one_of_odd ha, cast_val_eq, Nat.two_mul_div_two_of_even]
-    · rw [eq_comm]; apply Nat.sub_one_add_one; exact ne_zero_of_odd ha
-    · rw [← Nat.sub_one_add_one (ne_zero_of_odd ha), Nat.odd_add_one, Nat.not_odd_iff_even] at ha
-      exact ha
-
-/-- If a global hub exists in the `pairedFlightSchedule`, it must be assigned an odd number. -/
-lemma not_even_global_hub {k : ℕ} [NeZero k] {hub : Country (2 * k)}
-    (h : ∀ (city : Country (2 * k)), hub = city ∨ IsConnectedInPairedFlightSchedule hub city) :
-    ¬Even hub.val := by
-  by_contra ha
-  absurd h (hub.val + 1 : ℕ)
-  have cast_val_eq : ((hub.val + 1 : ℕ) : Country (2 * k)).val = hub.val + 1 := by
-    apply Fin.val_cast_of_lt
-    apply Nat.add_one_lt_of_even ha (by simp)
+    apply Nat.add_one_lt_of_even h_hub (by simp)
     exact Fin.prop hub
-  simp
   constructor
   · apply Fin.ne_of_val_ne
     rw [cast_val_eq]
     simp
-  · unfold IsConnectedInPairedFlightSchedule
-    rw [ne_eq, not_not, ← Nat.mul_right_inj (show 2 ≠ 0 by simp), ← Nat.add_one_inj]
-    rw [Nat.two_mul_div_two_of_even ha, cast_val_eq, Nat.two_mul_div_two_add_one_of_odd]
+  · unfold pairedFlightSchedule
+    simp only
+    rw [ne_eq, not_not, cast_val_eq, ← Nat.mul_left_inj (show 2 ≠ 0 by simp)]
+    rw [Nat.div_two_mul_two_of_even h_hub, ← Nat.add_one_inj, Nat.div_two_mul_two_add_one_of_odd]
     rw [Nat.odd_add_one, Nat.not_odd_iff_even]
-    exact ha
+    exact h_hub
 
-/-- A flight schedule where two different cities are not connected if and only if they are
-assigned numbers where the greater number is odd and the successor of the other number. -/
-def pairedFlightSchedule {k : ℕ} [NeZero k] : FlightSchedule (2 * k) := by
-  refine ⟨IsConnectedInPairedFlightSchedule, ?_, ?_, ?_⟩
-  · intro _
-    unfold IsConnectedInPairedFlightSchedule
+/-- In the `pairedFlightSchedule`, a city that is assigned an odd number is not connected to
+one other city (its predecessor). -/
+lemma exists_city_of_odd_hub (h_hub : Odd hub.val) :
+    ∃ city, hub ≠ city ∧ ¬pairedFlightSchedule.connected hub city := by
+  use (hub.val - 1 : ℕ)
+  have cast_val_eq : ((hub.val - 1 : ℕ) : City (2 * k)).val = hub.val - 1 := by
+    apply Fin.val_cast_of_lt
+    calc
+      _ ≤ hub.val := by simp
+      _ < 2 * k := Fin.prop hub
+  constructor
+  · apply Fin.ne_of_val_ne
+    rw [cast_val_eq, ne_comm]
+    apply Nat.sub_one_ne_self
+    exact ne_zero_of_odd h_hub
+  · unfold pairedFlightSchedule
+    simp only
+    rw [ne_eq, not_not, ← Nat.mul_right_inj (show 2 ≠ 0 by simp), ← Nat.add_one_inj]
+    rw [Nat.two_mul_div_two_add_one_of_odd h_hub, cast_val_eq, Nat.two_mul_div_two_of_even]
+    · rw [eq_comm]; apply Nat.sub_one_add_one; exact ne_zero_of_odd h_hub
+    · rw [← Nat.sub_one_add_one (ne_zero_of_odd h_hub), Nat.odd_add_one, Nat.not_odd_iff_even] at h_hub
+      exact h_hub
+
+/-- `pairedFlightSchedule` is a valid flight schedule. -/
+lemma paired_flight_schedule_is_valid : IsValidFlightSchedule (@pairedFlightSchedule k) := by
+  constructor
+  . intro _
+    unfold pairedFlightSchedule
     simp
   · intros _ _
-    unfold IsConnectedInPairedFlightSchedule
-    rw [ne_comm]
+    unfold pairedFlightSchedule
     simp
-  · by_contra ha
-    let ⟨hub, ha⟩ := ha
-    apply absurd (even_global_hub ha) (not_even_global_hub ha)
+    rw [eq_comm]
+    simp
+  · simp
+    intro hub
+    by_cases h_hub : Even hub.val
+    · exact exists_city_of_even_hub h_hub
+    · rw [Nat.not_even_iff_odd] at h_hub
+      exact exists_city_of_odd_hub h_hub
 
-instance decidableConnectedInPairedFlightSchedule {k : ℕ} [NeZero k]
-    (city1 city2 : Country (2 * k)) : Decidable (pairedFlightSchedule.connected city1 city2) := by
-  unfold pairedFlightSchedule IsConnectedInPairedFlightSchedule; infer_instance
+/-- Decides whether two cities in the `pairedFlightSchedule` are connected (irrelevant for the
+proof but nice to have). -/
+instance decidablePairedFlightScheduleConnected
+    {city₁ city₂ : City (2 * k)} : Decidable (pairedFlightSchedule.connected city₁ city₂) := by
+  unfold pairedFlightSchedule
+  infer_instance
 
 /-- All cities that are assigned an even number (each representing the pair consisting of the
 city itself ans its successor). -/
-def allPairRepr : Finset (Country (2 * k)) :=
+def allPairRepr : Finset (City (2 * k)) :=
   (Finset.range k).image (fun n ↦ (2 * n : ℕ))
 
 /-- The representants of all selected cities. -/
-def selectedPairRepr : Finset (Country (2 * k)) :=
+def selectedPairRepr (cities : Finset (City (2 * k))) : Finset (City (2 * k)) :=
   cities.image (fun city ↦ (city.val / 2 * 2 : ℕ))
 
-/-
-def findHub (cities : Finset (Country (2 * k))) : Country (2 * k) :=
-  (allPairRepr \ selectedPairRepr cities).min.get!
--/
+/-- Returns a city that is connected to all `selectedCities` (or a default value if it does not
+exist) (irrelevant for the proof but nice to have). -/
+def findHub (k : ℕ) [NeZero k] (selectedCities : Finset (City (2 * k))) : City (2 * k) :=
+  (allPairRepr \ selectedPairRepr selectedCities).min.get!
 
 lemma card_all_pair_repr : #(@allPairRepr k _) = k := by
   unfold allPairRepr
@@ -131,8 +147,8 @@ lemma card_all_pair_repr : #(@allPairRepr k _) = k := by
   exact h
 
 /-- There exists a pair of cities that are not selected ("unselected pair"). -/
-lemma exists_city_mem_sdiff (h_cities : #cities ≤ k - 1) :
-    ∃ city, city ∈ allPairRepr \ selectedPairRepr cities := by
+lemma exists_city_mem_sdiff (h_cities : #selectedCities ≤ k - 1) :
+    ∃ city, city ∈ allPairRepr \ selectedPairRepr selectedCities := by
   conv =>
     args; ext city; rw [Finset.mem_sdiff]
   apply Finset.exists_mem_not_mem_of_card_lt_card
@@ -142,7 +158,7 @@ lemma exists_city_mem_sdiff (h_cities : #cities ≤ k - 1) :
   refine le_trans ?_ h_cities
   exact Finset.card_image_le
 
-lemma even_hub (hub : Country (2 * k)) (h_hub : hub ∈ allPairRepr \ selectedPairRepr cities) :
+lemma even_hub (h_hub : hub ∈ allPairRepr \ selectedPairRepr selectedCities) :
     2 ∣ hub.val := by
   unfold allPairRepr at h_hub
   simp at h_hub
@@ -152,40 +168,29 @@ lemma even_hub (hub : Country (2 * k)) (h_hub : hub ∈ allPairRepr \ selectedPa
   simp
 
 /-- A city of an unselected pair is connected to all selected cities. -/
-lemma paired_flight_schedule_connected {cities : Finset (Country (2 * k))} {hub city : Country (2 * k)}
-    (h_hub : hub ∈ allPairRepr \ selectedPairRepr cities) (h_city : city ∈ cities) :
+lemma paired_flight_schedule_connected {city : City (2 * k)}
+    (h_hub : hub ∈ allPairRepr \ selectedPairRepr selectedCities) (h_city : city ∈ selectedCities) :
     pairedFlightSchedule.connected hub city := by
-  unfold pairedFlightSchedule FlightSchedule.connected IsConnectedInPairedFlightSchedule
+  unfold pairedFlightSchedule
   by_contra ha; absurd h_hub
   apply Finset.not_mem_sdiff_of_mem_right
   unfold selectedPairRepr
   rw [Finset.mem_image]
   use city
   refine ⟨h_city, ?_⟩
-  rw [← ha, Nat.div_mul_cancel (even_hub cities hub h_hub), Fin.cast_val_eq_self]
-
-/-
-lemma find_hub_spec (h_cities : #cities ≤ k - 1) (city : Country (2 * k)) (h_city : city ∈ cities) :
-    (findHub cities).val / 2 ≠ city.val / 2 := by
-  unfold findHub
-  have ⟨hub', h_hub'⟩ := exists_city_mem_sdiff cities h_cities
-  have ⟨hub, h_hub⟩ := Finset.min_of_mem h_hub'
-  rw [h_hub, ← WithTop.some_eq_coe, Option.get!_some]
-  apply hub_div_two_ne_city_div_two cities hub city
-  · exact Finset.mem_of_min h_hub
-  · exact h_city
--/
-
---#eval @findHub 100 _ {0, 1, 2, 3, 4, 5, 6}
+  rw [← ha, Nat.div_mul_cancel (even_hub h_hub), Fin.cast_val_eq_self]
 
 /-- For any `k - 1` selected cities there exists a hub connected to all of the selected cities. -/
-lemma existHubs_paired_flight_schedule {k : ℕ} [NeZero k] :
-    @ExistHubs (2 * k) (k - 1) pairedFlightSchedule := by
+lemma existHubs_paired_flight_schedule : @ExistHubs (2 * k) (k - 1) pairedFlightSchedule := by
   intros cities h_cities
-  have ⟨hub, h_hub⟩ := exists_city_mem_sdiff cities (le_of_eq h_cities)
+  have ⟨hub, h_hub⟩ := exists_city_mem_sdiff (le_of_eq h_cities)
   use hub
   intros city h_city
   exact paired_flight_schedule_connected h_hub h_city
+
+end ExistsFlightSchedule
+
+section NotExistsFlightSchedule
 
 /-- One of the colors red, blue and gray (with latter being the initial color of the cities). -/
 inductive Color where
@@ -221,21 +226,25 @@ lemma Color.invert_eq_gray {color : Color} : color.invert = .gray ↔ color = .g
   · intro h
     rw [h]
 
+variable {k : ℕ} {fs : FlightSchedule (2 * k)} {colorMap : City (2 * k) → Color}
+  {city₁ city₂ city : City (2 * k)}
+
 /-- Each non-gray city is diconnected from at least one inverse-colored city. -/
-def NeighboursCondition (fs : FlightSchedule (2 * k)) (colorMap : Country (2 * k) → Color) : Prop :=
+def NeighboursCondition (fs : FlightSchedule (2 * k)) (colorMap : City (2 * k) → Color) : Prop :=
   ∀ city₁, colorMap city₁ ≠ .gray → ∃ city₂, ¬fs.connected city₁ city₂ ∧
   (colorMap city₁).invert = colorMap city₂
 
+def ColorMap (k : ℕ) : Type := City (2 * k) → Color
+
 /-- In the given `colorMap` (assigning each city a color), at least `i` cities are non-gray and
 the `NeighboursCondition` is fulfilled. -/
-structure IsIColorMap (fs : FlightSchedule (2 * k)) (i : ℕ) (colorMap : Country (2 * k) → Color) :
+structure IsValidColorMap (fs : FlightSchedule (2 * k)) (i : ℕ) (colorMap : ColorMap k) :
     Prop where
   card : i ≤ #{city | colorMap city ≠ .gray}
   neigh : NeighboursCondition fs colorMap
 
-omit [NeZero k] in
-lemma card_filter_ne_gray {colorMap : Country (2 * k) → Color}
-    (h : ¬∃ city, colorMap city = Color.gray) : 2 * k = #{city | colorMap city ≠ Color.gray} := by
+lemma card_filter_ne_gray (h : ¬∃ city, colorMap city = Color.gray) :
+    2 * k = #{city | colorMap city ≠ Color.gray} := by
   conv => lhs; rw [← Finset.card_fin (2 * k)]
   rw [eq_comm, Finset.card_filter_eq_iff]
   intros city _
@@ -243,22 +252,19 @@ lemma card_filter_ne_gray {colorMap : Country (2 * k) → Color}
   absurd h
   use city
 
-omit [NeZero k] in
-lemma all_cities_not_global_hub (fs : FlightSchedule (2 * k)) :
+lemma all_cities_not_global_hub (h_fs : IsValidFlightSchedule fs) :
     ∀ hub, ∃ city, hub ≠ city ∧ ¬fs.connected hub city := by
-  have h := fs.not_exists_global_hub
+  have h := h_fs.not_exists_global_hub
   simp at h
   exact h
 
 /-- Turns an existing `colorMap` into a new one where all cities keep their color except for
 `city₁`, which is assigned the inverse of the color of `city₂`. -/
-def colorSingleCity (colorMap : Country (2 * k) → Color) (city₁ city₂ : Country (2 * k))
-    (city' : Country (2 * k)) : Color :=
+def colorSingleCity (colorMap : ColorMap k) (city₁ city₂ : City (2 * k))
+    (city' : City (2 * k)) : Color :=
   if city' = city₁ then (colorMap city₂).invert else colorMap city'
 
-omit [NeZero k] in
-lemma color_single_city_card {colorMap : Country (2 * k) → Color} {city₁ city₂ : Country (2 * k)}
-    (h_city₁ : colorMap city₁ = .gray) (h_city₂ : colorMap city₂ ≠ .gray) :
+lemma color_single_city_card (h_city₁ : colorMap city₁ = .gray) (h_city₂ : colorMap city₂ ≠ .gray) :
     #{city' | colorMap city' ≠ .gray} + 1 ≤
     #{city' | (colorSingleCity colorMap city₁ city₂) city' ≠ .gray} := by
   rw [← @Finset.card_insert_of_not_mem _ _ city₁ _ (by simp; exact h_city₁)]
@@ -273,9 +279,7 @@ lemma color_single_city_card {colorMap : Country (2 * k) → Color} {city₁ cit
   · rw [or_iff_not_imp_left] at h_city'
     exact h_city' h_city'_city₁
 
-omit [NeZero k] in
-lemma color_single_city_neigh {fs : FlightSchedule (2 * k)} {colorMap : Country (2 * k) → Color}
-    (h_color_map : NeighboursCondition fs colorMap) {city₁ city₂ : Country (2 * k)}
+lemma color_single_city_neigh (h_color_map : NeighboursCondition fs colorMap)
     (h_city₁ : colorMap city₁ = .gray) (h_city₁_city₂ : ¬fs.connected city₁ city₂ ∧ city₁ ≠ city₂) :
     NeighboursCondition fs (colorSingleCity colorMap city₁ city₂) := by
   intros city'₁ h_city'₁
@@ -301,15 +305,14 @@ lemma color_single_city_neigh {fs : FlightSchedule (2 * k)} {colorMap : Country 
 
 /-- Turns an existing `colorMap` into a new one where all cities keep their color except for
 `city₁` and `city₂`, which are assigned inverse colors. -/
-def colorPairOfCities (colorMap : Country (2 * k) → Color) (city₁ city₂ : Country (2 * k))
-    (city' : Country (2 * k)) : Color :=
+def colorPairOfCities (colorMap : ColorMap k) (city₁ city₂ : City (2 * k))
+    (city' : City (2 * k)) : Color :=
   if city' = city₁ then .red
   else if city' = city₂ then .blue
   else colorMap city'
 
-omit [NeZero k] in
-lemma color_pair_of_cities_card {colorMap : Country (2 * k) → Color} {city₁ city₂ : Country (2 * k)}
-    (h_city₁ : colorMap city₁ = .gray) : #{city' | colorMap city' ≠ .gray} + 1 ≤
+lemma color_pair_of_cities_card (h_city₁ : colorMap city₁ = .gray) :
+    #{city' | colorMap city' ≠ .gray} + 1 ≤
     #{city' | (colorPairOfCities colorMap city₁ city₂) city' ≠ .gray} := by
   rw [← @Finset.card_insert_of_not_mem _ _ city₁ _ (by simp; exact h_city₁)]
   apply Finset.card_le_card
@@ -323,9 +326,8 @@ lemma color_pair_of_cities_card {colorMap : Country (2 * k) → Color} {city₁ 
   · rw [or_iff_not_imp_left] at h_city'
     exact h_city' h
 
-omit [NeZero k] in
-lemma color_pair_of_cities_neigh {fs : FlightSchedule (2 * k)} {colorMap : Country (2 * k) → Color}
-    (h_color_map : NeighboursCondition fs colorMap) {city₁ city₂ : Country (2 * k)}
+lemma color_pair_of_cities_neigh (h_fs : IsValidFlightSchedule fs)
+    (h_color_map : NeighboursCondition fs colorMap)
     (h_city₁ : colorMap city₁ = .gray) (h_city₂ : colorMap city₂ = .gray)
     (h_city₁_city₂ : ¬fs.connected city₁ city₂ ∧ city₁ ≠ city₂) :
     NeighboursCondition fs (colorPairOfCities colorMap city₁ city₂) := by
@@ -340,7 +342,7 @@ lemma color_pair_of_cities_neigh {fs : FlightSchedule (2 * k)} {colorMap : Count
     simp
   · use city₁
     rw [h_city'₁_city₂]
-    refine ⟨by by_contra; absurd h_city₁_city₂.left; apply fs.symm; assumption, ?_⟩
+    refine ⟨by by_contra; absurd h_city₁_city₂.left; apply h_fs.symm; assumption, ?_⟩
     rw [ite_cond_eq_false _ _ (eq_false h_city₁_city₂.right.symm)]
     rw [ite_cond_eq_false _ _ (eq_false h_city₁_city₂.right)]
     simp
@@ -365,11 +367,10 @@ lemma color_pair_of_cities_neigh {fs : FlightSchedule (2 * k)} {colorMap : Count
     rw [ite_cond_eq_false _ _ (eq_false h_city'₂_city₂)]
     exact h_city'₂.right
 
-omit [NeZero k] in
 /-- For each `FlightSchedule` there exists a "complete" color map. -/
-lemma exists_color_map (fs : FlightSchedule (2 * k)) : ∃ colorMap,
-    IsIColorMap fs (2 * k) colorMap := by
-  have h (i : ℕ) (hi : i ≤ 2 * k) : ∃ colorMap, IsIColorMap fs i colorMap := by
+lemma exists_color_map (h_fs : IsValidFlightSchedule fs) : ∃ colorMap,
+    IsValidColorMap fs (2 * k) colorMap := by
+  have h (i : ℕ) (hi : i ≤ 2 * k) : ∃ colorMap, IsValidColorMap fs i colorMap := by
     induction i with
     | zero =>
       refine ⟨fun _ ↦ .gray, by simp, ?_⟩
@@ -379,14 +380,14 @@ lemma exists_color_map (fs : FlightSchedule (2 * k)) : ∃ colorMap,
       have ⟨colorMap, h_color_map⟩ := h_ind (Nat.le_of_add_right_le hi)
       by_cases h_exists_city : ∃ city, colorMap city = .gray
       · have ⟨city₁, h_city₁⟩ := h_exists_city
-        have ⟨city₂, h_city₂⟩ := all_cities_not_global_hub fs city₁
+        have ⟨city₂, h_city₂⟩ := all_cities_not_global_hub h_fs city₁
         by_cases h_city₂_gray : colorMap city₂ = .gray
         · use colorPairOfCities colorMap city₁ city₂
           constructor
           · calc
               _ ≤ #{city | colorMap city ≠ Color.gray} + 1 := by simp; exact h_color_map.card
               _ ≤ _ := color_pair_of_cities_card h_city₁
-          · exact color_pair_of_cities_neigh h_color_map.neigh h_city₁ h_city₂_gray h_city₂.symm
+          · exact color_pair_of_cities_neigh h_fs h_color_map.neigh h_city₁ h_city₂_gray h_city₂.symm
         · use colorSingleCity colorMap city₁ city₂
           constructor
           · calc
@@ -400,10 +401,8 @@ lemma exists_color_map (fs : FlightSchedule (2 * k)) : ∃ colorMap,
   apply h
   simp
 
-omit [NeZero k] in
-lemma invert_red_iff_ne_red_of_complete_color_map {fs : FlightSchedule (2 * k)}
-    {colorMap : Country (2 * k) → Color}
-    (h_color_map : IsIColorMap fs (2 * k) colorMap) {city : Country (2 * k)} :
+lemma invert_red_iff_ne_red_of_complete_color_map
+    (h_color_map : IsValidColorMap fs (2 * k) colorMap) :
     (colorMap city).invert = .red ↔ ¬(colorMap city = .red) := by
   unfold Color.invert
   split
@@ -424,18 +423,17 @@ lemma invert_red_iff_ne_red_of_complete_color_map {fs : FlightSchedule (2 * k)}
     exact h city
 
 /-- The set of red cities in `colorMap`. -/
-def redCities (colorMap : Country (2 * k) → Color) : Finset (Country (2 * k)) :=
+def redCities (colorMap : ColorMap k) : Finset (City (2 * k)) :=
   {city | colorMap city = .red}
 
 /-- The set of blue cities in `colorMap`. -/
-def blueCities (colorMap : Country (2 * k) → Color) : Finset (Country (2 * k)) :=
+def blueCities (colorMap : ColorMap k) : Finset (City (2 * k)) :=
   {city | colorMap city = .blue}
 
-omit [NeZero k] in
 /-- WLOG, we can assume that in the `colorMap`, there are at most `k` red cities. -/
-lemma exists_color_map_with_card (fs : FlightSchedule (2 * k)) :
-    ∃ colorMap, IsIColorMap fs (2 * k) colorMap ∧ #(redCities colorMap) ≤ k := by
-  have ⟨colorMap, h_color_map⟩ := exists_color_map fs
+lemma exists_color_map_with_card (h_fs : IsValidFlightSchedule fs) :
+    ∃ colorMap, IsValidColorMap fs (2 * k) colorMap ∧ #(redCities colorMap) ≤ k := by
+  have ⟨colorMap, h_color_map⟩ := exists_color_map h_fs
   by_cases h : #(redCities colorMap) ≤ k
   · use colorMap
   · use (fun city ↦ (colorMap city).invert)
@@ -459,9 +457,8 @@ lemma exists_color_map_with_card (fs : FlightSchedule (2 * k)) :
       simp at h
       exact h.le
 
-omit [NeZero k] in
 /-- We can select all red cities and suffiently many additional blue cities. -/
-lemma exist_selected_cities {n : ℕ} (hn : k ≤ n ∧ n ≤ 2 * k) {colorMap : Country (2 * k) → Color}
+lemma exist_selected_cities {n : ℕ} (hn : k ≤ n ∧ n ≤ 2 * k)
     (h_red_cities : #(redCities colorMap) ≤ k) : ∃ selectedCities,
     redCities colorMap ⊆ selectedCities ∧ #selectedCities = n := by
   apply Finset.exists_superset_card_eq
@@ -469,27 +466,25 @@ lemma exist_selected_cities {n : ℕ} (hn : k ≤ n ∧ n ≤ 2 * k) {colorMap :
   · simp
     exact hn.right
 
-omit [NeZero k] in
-lemma mem_selected_cities_of_red {colorMap : Country (2 * k) → Color}
-    {selectedCities : Finset (Country (2 * k))}
-    (h_selected_cities : redCities colorMap ⊆ selectedCities) {city : Country (2 * k)}
+lemma mem_selected_cities_of_red {selectedCities : Finset (City (2 * k))}
+    (h_selected_cities : redCities colorMap ⊆ selectedCities) {city : City (2 * k)}
     (h_city : colorMap city = .red) : city ∈ selectedCities := by
   apply Finset.mem_of_subset h_selected_cities
   unfold redCities
   simp
   exact h_city
 
-omit [NeZero k] in
 /-- No city is connected to all red cities and all blue selected cities. -/
-lemma not_exists_hub_of_color_map {fs : FlightSchedule (2 * k)} {colorMap : Country (2 * k) → Color}
-    (h_color_map : IsIColorMap fs (2 * k) colorMap) {selectedCities : Finset (Country (2 * k))}
+lemma not_exists_hub_of_color_map (h_fs : IsValidFlightSchedule fs)
+    (h_color_map : IsValidColorMap fs (2 * k) colorMap)
+    {selectedCities : Finset (City (2 * k))}
     (h_selected_cities : redCities colorMap ⊆ selectedCities) :
     ¬∃ hub, ∀ city ∈ selectedCities, fs.connected hub city := by
   by_contra ha
   have ⟨hub, h_hub⟩ := ha
   cases h : colorMap hub with
   | red =>
-    absurd fs.irrefl
+    absurd h_fs.irrefl
     simp
     use hub
     apply h_hub hub
@@ -510,14 +505,18 @@ lemma not_exists_hub_of_color_map {fs : FlightSchedule (2 * k)} {colorMap : Coun
       simp
       use hub
 
+end NotExistsFlightSchedule
+
 /-- The proof generalized for a country with `2 * k` cities. -/
 theorem generalizedProof {k : ℕ} [NeZero k] :
-  IsGreatest {n | n ≤ 2 * k ∧ ∃ fs : FlightSchedule (2 * k), ExistHubs n fs} (k - 1) := by
+    IsGreatest {n | n ≤ 2 * k ∧ ∃ fs : FlightSchedule (2 * k),
+    IsValidFlightSchedule fs ∧ ExistHubs n fs} (k - 1) := by
   constructor
   · refine ⟨by trans k; simp; apply Nat.le_mul_of_pos_left k (show 0 < 2 by simp), ?_⟩
     use pairedFlightSchedule
+    refine ⟨paired_flight_schedule_is_valid, ?_⟩
     intros cities h_cities
-    have ⟨hub, h_hub⟩ := exists_city_mem_sdiff cities (le_of_eq h_cities)
+    have ⟨hub, h_hub⟩ := exists_city_mem_sdiff (le_of_eq h_cities)
     use hub
     intros city h_city
     exact paired_flight_schedule_connected h_hub h_city
@@ -527,11 +526,11 @@ theorem generalizedProof {k : ℕ} [NeZero k] :
     have ⟨fs, h_fs⟩ := hn.right
     by_contra ha
     rw [← lt_iff_not_ge, Nat.lt_iff_add_one_le, Nat.sub_one_add_one (NeZero.ne k)] at ha
-    have ⟨colorMap, h_color_map⟩ := exists_color_map_with_card fs
+    have ⟨colorMap, h_color_map⟩ := exists_color_map_with_card h_fs.left
     have ⟨selectedCities, h_selected_cities⟩ :=
       exist_selected_cities ⟨ha, hn.left⟩ h_color_map.right
-    absurd h_fs selectedCities h_selected_cities.right
-    exact not_exists_hub_of_color_map h_color_map.left h_selected_cities.left
+    absurd h_fs.right selectedCities h_selected_cities.right
+    exact not_exists_hub_of_color_map h_fs.left h_color_map.left h_selected_cities.left
 
 end Proof
 
@@ -541,7 +540,8 @@ section Result
 
 def solution : ℕ := 1011
 
-theorem proof : IsGreatest {n | n ≤ 2024 ∧ ∃ fs : FlightSchedule 2024, ExistHubs n fs} solution := by
+theorem proof : IsGreatest {n | n ≤ 2024 ∧ ∃ fs : FlightSchedule 2024,
+    IsValidFlightSchedule fs ∧ ExistHubs n fs} solution := by
   rw [show 2024 = 2 * 1012 by rfl]
   exact generalizedProof
 
@@ -553,9 +553,8 @@ end Result
 * Generalize to arbitrary amount of cities
 * Add comments (kinda)
 * Simplify proof for neighbourhood condition in colorSingleCity (check)
-* Use more section variables
+* Use more section variables (check)
 * Add computable functions
 * Use redCities / blueCities definition where appropriate (check)
 * Squish tactic proofs
-* `IsIColorMap` should include color map
 -/
