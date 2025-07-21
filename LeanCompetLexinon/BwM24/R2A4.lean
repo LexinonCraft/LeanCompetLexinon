@@ -7,7 +7,7 @@ import Mathlib.Data.Fintype.Card
 import Mathlib.Algebra.Group.Fin.Basic
 
 /-!
-# BwM R2 A4
+# BwM24 R2 A4
 
 In the country of Sikinia there are `2024` cities. Some of these are connected via direct,
 bidirectional flight connections. No city is connected to all other cities. However, there is a
