@@ -23,6 +23,8 @@ It will be shown that the greatest value of `n` is `1011`. In fact, in a country
 * Add computable functions
 -/
 
+namespace BwM24R2A4
+
 section Problem
 
 /-! ## Definitions for setting up the problem -/
@@ -57,6 +59,7 @@ section Proof
 /-! ## Lemmas and definitions for the proof -/
 
 open Finset
+open Fin.NatCast
 
 /-- There exists a hub for `n ≤ k` selected cities out of `k` cities if and only if `n < nBound k`. -/
 def nBound (k : ℕ) : ℕ := k / 2
@@ -96,7 +99,8 @@ one other city in `pairedFlightSchedule`. -/
 lemma not_hub_last_city (h_hub : ¬Odd hub.val ∧ hub + 1 = k) :
     hub ≠ 0 ∧ ¬pairedFlightSchedule.connected hub 0 := by
   constructor
-  · rw [ne_eq, ← add_left_inj 1, h_hub.right]
+  · rw [← Fin.cast_val_eq_self 0]
+    rw [ne_eq, ← add_left_inj 1, h_hub.right]
     simp
     exact Nat.AtLeastTwo.ne_one
   · unfold pairedFlightSchedule pairRepr
@@ -209,7 +213,7 @@ lemma card_all_pair_repr : nBound k ≤ #(@allPairRepr k) := by
 lemma exists_city_mem_sdiff (h_cities : #selectedCities < nBound k) :
     ∃ city, city ∈ allPairRepr \ selectedPairRepr selectedCities := by
   conv => args; ext city; rw [Finset.mem_sdiff]
-  apply Finset.exists_mem_not_mem_of_card_lt_card
+  apply Finset.exists_mem_notMem_of_card_lt_card
   calc
     _ ≤ #selectedCities := by unfold selectedPairRepr; apply Finset.card_image_le
     _ < nBound k := h_cities
@@ -352,7 +356,7 @@ def colorSingleCity (colorMap : ColorMap k) (city₁ city₂ : City k) : ColorMa
 lemma color_single_city_card (h_city₁ : colorMap city₁ = .gray) (h_city₂ : colorMap city₂ ≠ .gray) :
     #{city' | colorMap city' ≠ .gray} + 1 ≤
     #{city' | (colorSingleCity colorMap city₁ city₂) city' ≠ .gray} := by
-  rw [← @Finset.card_insert_of_not_mem _ _ city₁ _ (by simp; exact h_city₁)]
+  rw [← @Finset.card_insert_of_notMem _ _ city₁ _ (by simp; exact h_city₁)]
   apply Finset.card_le_card
   intros city' h_city'
   simp at h_city'
@@ -399,7 +403,7 @@ def colorPairOfCities (colorMap : ColorMap k) (city₁ city₂ : City k) : Color
 lemma color_pair_of_cities_card (h_city₁ : colorMap city₁ = .gray) :
     #{city' | colorMap city' ≠ .gray} + 1 ≤
     #{city' | (colorPairOfCities colorMap city₁ city₂) city' ≠ .gray} := by
-  rw [← @Finset.card_insert_of_not_mem _ _ city₁ _ (by simp; exact h_city₁)]
+  rw [← @Finset.card_insert_of_notMem _ _ city₁ _ (by simp; exact h_city₁)]
   apply Finset.card_le_card
   intros city' h_city'
   simp at h_city'
@@ -542,7 +546,7 @@ lemma exists_color_map_with_card (h_fs : IsValidFlightSchedule fs) :
       by_cases h_k : Even k
       · conv => lhs; rw [← Nat.div_two_mul_two_of_even h_k, mul_two]
         simp
-        apply le_of_not_le
+        apply le_of_not_ge
         exact h
       · rw [Nat.not_even_iff_odd] at h_k
         conv => lhs; rw [← Nat.div_two_mul_two_add_one_of_odd h_k, mul_two]
@@ -640,3 +644,5 @@ theorem proof : IsGreatest {n | n ≤ 2024 ∧ ∃ fs : FlightSchedule 2024,
   exact generalizedProof
 
 end Result
+
+end BwM24R2A4

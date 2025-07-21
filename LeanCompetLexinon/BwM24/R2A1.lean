@@ -2,6 +2,8 @@ import Mathlib.Data.Set.Basic
 import Mathlib.Algebra.Order.Ring.Abs
 import Mathlib.Data.Nat.Choose.Sum
 
+namespace BwM24R2A1
+
 section Problem
 
 def equation (x y : ℤ) : Prop := (x + 2) ^ 4 - x ^ 4 = y ^ 3
@@ -142,3 +144,5 @@ theorem proof : ∀ x y, equation x y ↔ (x, y) ∈ solution := by
     simp
 
 end Result
+
+end BwM24R2A1

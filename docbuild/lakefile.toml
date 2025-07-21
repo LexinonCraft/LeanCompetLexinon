@@ -1,0 +1,12 @@
+name = "docbuild"
+reservoir = false
+version = "0.1.0"
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "LeanCompetLexinon"
+path = "../"
+
+[[require]]
+scope = "leanprover"
+name = "doc-gen4"

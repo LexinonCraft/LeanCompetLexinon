@@ -271,7 +271,7 @@ lemma lt_pigeon_hole (a b : ℕ) (h₁ : a ≤ b) (h₂ : ∀ c ≤ b, seq c < a
   let ⟨n, hn, m, hm, n_ne_m, f_n_eq_f_m⟩ : ∃ n ∈ pigeons, ∃ m ∈ pigeons, n ≠ m ∧ seq n = seq m := by
     apply @exists_ne_map_eq_of_card_lt_of_maps_to _ _ _ pigeonHoles
     · rw [card_range, card_range]; exact h₁
-    · intros n hn; rw [mem_range]; apply h₂; rw [Nat.le_iff_lt_add_one, ← mem_range]
+    · intros n hn; unfold pigeonHoles; simp; apply h₂; rw [Nat.le_iff_lt_add_one, ← mem_range]
       exact hn
   rw [mem_range, ← Nat.le_iff_lt_add_one] at hn hm; use n; refine ⟨hn, ?_⟩; use m
 
