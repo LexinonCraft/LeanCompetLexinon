@@ -1,11 +1,26 @@
+/-
+(c) Lexinon 2025
+-/
 import Mathlib.Data.Set.Basic
 import Mathlib.Algebra.Order.Ring.Abs
 import Mathlib.Data.Nat.Choose.Sum
+
+/-!
+# BwM24 R2 A1
+
+The contestants are asked to determine all integer solutions `(x, y)` of the equation
+`(x + 2) ^ 4 - x ^ 4 = y ^ 3`.
+
+It will be shown that `(-1, 0)` is the only solution.
+-/
 
 namespace BwM24R2A1
 
 section Problem
 
+/-! ## Definitions for setting up the problem -/
+
+/-- The equation to be fulfilled by `(x, y)` as a `Prop`. -/
 def equation (x y : ℤ) : Prop := (x + 2) ^ 4 - x ^ 4 = y ^ 3
 
 end Problem
@@ -14,84 +29,29 @@ end Problem
 
 section Proof
 
-lemma equation_iff_quadratic (a b : ℤ) :
-  equation (a - 1) (b + 2 * a) ↔
-  0 = 12 * b * a ^ 2 + (6 * b ^ 2 - 8) * a + b ^ 3 := by
-  conv =>
-    lhs
-    unfold equation
-    rw [sub_add, show b + 2 * a = 2 * a + b by rw [add_comm]]
-    simp
-    rw [add_pow, sub_pow, add_pow]
-    unfold Finset.sum
-    unfold Nat.choose
-    simp
-    rw [add_sub_add_comm, add_sub_add_comm, add_sub_add_comm]
-    simp
-    rw [← two_mul, ← two_mul]
-    rw [show a ^ 3 * 4 = 4 * a ^ 3 by rw [mul_comm], ← mul_assoc]
-    rw [show a * 4 = 4 * a by rw [mul_comm], ← mul_assoc]
-    simp
-    rw [show 8 * a ^ 3 = 2 ^ 3 * a ^ 3 by rfl, ← mul_pow, add_right_inj]
-    conv =>
-      rhs; left
-      rw [mul_comm, ← mul_assoc, mul_pow, ← mul_assoc]
-      simp
-      rw [mul_assoc, show a ^ 2 * b = b * a ^ 2 by rw [mul_comm], ← mul_assoc]
-    conv =>
-      rhs; right; left
-      rw [mul_comm, ← mul_assoc, ← mul_assoc]
-      simp
-      rw [mul_assoc, show a * b ^ 2 = b ^ 2 * a by rw [mul_comm], ← mul_assoc]
-    rw [← add_assoc, show 8 * a = -((-8) * a) by simp, neg_eq_iff_add_eq_zero, add_comm]
-    rw [add_assoc, show b ^ 3 + (-8) * a = (-8) * a + b ^ 3 by rw [add_comm]]
-    rw [add_assoc]
-    conv =>
-      lhs; right
-      rw [← add_assoc, ← Distrib.right_distrib, ← sub_eq_add_neg]
-    rw [← add_assoc, Eq.comm]
+/-! ## Lemmas and definitions for the proof -/
 
-lemma exists_quadratic_root_imp_discrim_nonneg {a b c : ℤ} (h_a_neq_zero : a ≠ 0) :
-  (∃ x, 0 = a * x ^ 2 + b * x + c) → 0 ≤ b ^ 2 - 4 * (a * c) := by
+lemma quadratic_of_equation {a b : ℤ} (h : equation (a - 1) (b + 2 * a)) :
+    0 = 12 * b * a ^ 2 + (6 * b ^ 2 - 8) * a + b ^ 3 := by
+  unfold equation at h
+  rw [← zero_add ((b + 2 * a) ^ 3), ← sub_eq_iff_eq_add, ← neg_eq_zero] at h
+  rw [← h]
+  ring
+
+lemma exists_quadratic_root_imp_discrim_nonneg {a b c : ℤ} :
+    (∃ x, 0 = a * x ^ 2 + b * x + c) → 0 ≤ b ^ 2 - 4 * (a * c) := by
   intro ⟨x, h⟩
-  have h' : b ^ 2 - 4 * (a * c) = (2 * (a * x) + b) ^ 2:= by
-    rw [add_sq, mul_pow, sub_eq_iff_eq_add, add_assoc]
-    conv =>
-      rhs; right
-      rw [add_comm]
-    rw [← add_assoc, ← mul_assoc, mul_assoc]
-    simp
-    rw [← Distrib.left_distrib, ← Distrib.left_distrib]
-    simp
-    rw [mul_pow, sq, mul_assoc, mul_assoc, ← Distrib.left_distrib, ← Distrib.left_distrib]
-    rw [mul_eq_zero_iff_left h_a_neq_zero, show x * b = b * x by rw [mul_comm], Eq.comm]
-    exact h
-  calc 0
-    _ ≤ (2 * (a * x) + b) ^ 2 := sq_nonneg _
-    _ = _ := h'.symm
+  have h'' : 4 * a * (a * x ^ 2 + b * x + c) = (2 * a * x + b) ^ 2 - (b ^ 2 - 4 * (a * c)) := by
+    ring
+  rw [← h] at h''
+  simp at h''
+  rw [eq_comm, sub_eq_zero] at h''
+  rw [← h'']
+  apply sq_nonneg
 
 lemma simp_discrim (b : ℤ) : (6 * b ^ 2 - 8) ^ 2 - 4 * ((12 * b) * b ^ 3) =
-  -(12 * b ^ 4) - 96 * b ^ 2 + 64 := by
-  conv =>
-    lhs
-    conv =>
-      right
-      rw [mul_assoc, ← mul_assoc]
-      conv =>
-        right; left
-        rw [← pow_one b]
-      rw [← pow_add]
-      simp
-    conv =>
-      left
-      rw [sub_sq, mul_pow, ← pow_mul, mul_assoc]
-      conv =>
-        left; right; right
-        rw [mul_comm, ← mul_assoc]
-      rw [← mul_assoc]
-      simp
-    rw [sub_eq_add_neg, add_comm, ← add_assoc, add_sub_assoc', ← neg_mul, ← Distrib.right_distrib]
-    simp
+    -(12 * b ^ 4) - 96 * b ^ 2 + 64 := by
+  ring
 
 lemma b_eq_zero (b : ℤ) (h : 0 ≤ -(12 * b ^ 4) - 96 * b ^ 2 + 64) : b = 0 := by
   by_contra h_b_neq_zero
@@ -113,8 +73,12 @@ end Proof
 
 section Result
 
+/-! ## The solution and the proof of its correctness -/
+
+/-- The set of all solutions of `equation`. -/
 def solution : Set (ℤ × ℤ) := {(-1, 0)}
 
+/-- Proof that the above `solution` is correct. -/
 theorem proof : ∀ x y, equation x y ↔ (x, y) ∈ solution := by
   intros x y
   constructor
@@ -122,15 +86,13 @@ theorem proof : ∀ x y, equation x y ↔ (x, y) ∈ solution := by
     let b := y - 2 * a
     rw [show x = a - 1 by unfold a; simp, show y = b + 2 * a by unfold b; simp]
     intro h
-    rw [equation_iff_quadratic] at h
+    have h := quadratic_of_equation h
     have h_b_eq_zero : b = 0 := by
       by_contra h'
       absurd h'
       apply b_eq_zero
       rw [← simp_discrim b]
-      refine exists_quadratic_root_imp_discrim_nonneg ?_ ⟨a, h⟩
-      simp
-      exact h'
+      exact exists_quadratic_root_imp_discrim_nonneg ⟨a, h⟩
     rw [h_b_eq_zero] at h
     simp at h
     rw [h, h_b_eq_zero]
