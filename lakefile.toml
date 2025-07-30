@@ -1,6 +1,7 @@
 name = "LeanCompetLexinon"
 version = "0.1.0"
 keywords = ["math"]
+license = "MIT"
 defaultTargets = ["LeanCompetLexinon"]
 
 [leanOptions]

@@ -1,6 +1,8 @@
 /-
-(c) Lexinon 2025
+Copyright (c) Lexinon. All rights reserved.
+Licensed under the MIT license. See LICENSE file in the project root for details.
 -/
+
 import Mathlib.Algebra.Ring.Parity
 import Mathlib.Data.Finset.Max
 import Mathlib.Data.Fintype.Card
@@ -19,7 +21,8 @@ It will be shown that the greatest value of `n` is `1011`. In fact, in a country
 `n < k / 2` (where `/` is the division operator for natural numbers).
 
 ## TODO
-* Add more information to header
+
+* Add more information about the solution to the header
 * Add computable functions
 -/
 

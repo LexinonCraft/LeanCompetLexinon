@@ -1,6 +1,8 @@
 /-
-(c) Lexinon 2025
+Copyright (c) Lexinon. All rights reserved.
+Licensed under the MIT license. See LICENSE file in the project root for details.
 -/
+
 import Mathlib.Data.Set.Basic
 import Mathlib.Algebra.Order.Ring.Abs
 import Mathlib.Data.Nat.Choose.Sum

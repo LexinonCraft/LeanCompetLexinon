@@ -1,6 +1,8 @@
 /-
-(c) Lexinon 2025
+Copyright (c) Lexinon. All rights reserved.
+Licensed under the MIT license. See LICENSE file in the project root for details.
 -/
+
 import Mathlib.Data.Real.Basic
 import Mathlib.Data.Nat.Nth
 import Mathlib.Algebra.Order.Archimedean.Basic
@@ -21,7 +23,8 @@ positive integers $a_0,a_1,a_2,\dots$ which satisfies the following three condit
 It will be shown that for $r\in\mathbb{R}$, such a sequence exists if and only if $r\geq2$.
 
 ## TODO
-* Add more information to header
+
+* Add more information about the solution to the header
 * Add a function that explicitly computes where one of the conditions is violated in a given
 sequence for $r<2$
 -/
@@ -52,7 +55,7 @@ open scoped Finset
 
 section RGeTwo
 
-/-! ### Construct an example sequence for r>=2-/
+/-! ### Construct an example sequence for r>=2 -/
 
 variable (n n₁ n₂ m l m₁ l₁ m₂ l₂ k : ℕ) {n' : ℕ}
 
