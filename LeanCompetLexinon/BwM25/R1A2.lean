@@ -23,10 +23,6 @@ and proof that each of them appears infinitely many times in the sequence.
 
 It will be shown that the sequence only contains the digits $2,4,6,8$ (i. e. the non-zero even digits)
 and each of them infinitely many times.
-
-## TODO
-* Second part of the problem
-* Split up longer tactic proofs
 -/
 
 namespace BwM25R1A2
@@ -37,6 +33,7 @@ section Problem
 
 /-! ## Definitions for setting up the problem -/
 
+/-- The last non-zero decimal digit of `(n + 2)!`. -/
 def lastDigitFac (n : ℕ) : ℕ := ((Nat.digits 10 (n + 2)!).find? (· ≠ 0)).get!
 
 end Problem
@@ -62,8 +59,12 @@ lemma zero_lt_maxTwoPowLe {n : ℕ} : 0 < maxTwoPowLe (n + 2) := by
 neither `2` nor `5` divides `r`. -/
 @[ext]
 structure SimpleFactorization : Type where
+  /-- The amount of occurrences of the prime factor `2` in the factorization of the number. -/
   m₂ : ℕ
+  /-- The amount of occurrences of the prime factor `5` in the factorization of the number. -/
   m₅ : ℕ
+  /-- The number that you get when you remove all occurrences of the prime factors `2` and `5` in the
+  factorization of the number. -/
   r : ℕ
   hr : ¬2 ∣ r ∧ ¬5 ∣ r
 deriving Repr
@@ -476,69 +477,389 @@ lemma factorization_factorial_five_lt_two {n : ℕ} : Nat.factorization (n + 2)!
     use 1
     simp
 
+/-- This lemma will help us in both parts of the problem. -/
+lemma last_nonzero_digit_eq {l : ℕ} (hl : l ≠ 0) (hm₅m₂ : l.factorization 5 < l.factorization 2) :
+    ((Nat.digits 10 l).find? (· ≠ 0)).get! = l / 10 ^ l.factorization 5 % 10 := by
+  let rec aux (k : ℕ) {l : ℕ} (hl : l ≠ 0) (hm₅m₂ : l.factorization 5 < l.factorization 2)
+      (hk : l.factorization 5 = k) :
+      ((Nat.digits 10 l).find? (· ≠ 0)).get! = l / 10 ^ k % 10 := by
+    rw [Nat.digits_def' (by simp) (Nat.zero_lt_of_ne_zero hl), List.find?_cons]
+    rw [ne_eq] at hl
+    match k with
+    | 0 =>
+      have h : l % 10 ≠ 0 := by
+        rw [ne_eq, ← Nat.dvd_iff_mod_eq_zero, show 10 = 2 * 5 by rfl]
+        by_contra ha
+        have ha : 5 ∣ l := dvd_of_mul_left_dvd ha
+        absurd ha
+        rw [Nat.factorization_eq_zero_iff, eq_true Nat.prime_five, eq_false hl] at hk
+        simp at hk
+        exact hk
+      rw [decide_eq_true h]
+      simp
+    | k + 1 =>
+      have h : ¬l % 10 ≠ 0 := by
+        rw [ne_eq, not_not, ← Nat.dvd_iff_mod_eq_zero, show 10 = 2 * 5 by rfl]
+        apply Nat.Coprime.mul_dvd_of_dvd_of_dvd
+        · decide
+        · have h' : l.factorization 2 ≠ 0 := by
+            rw [Nat.ne_zero_iff_zero_lt]
+            apply Nat.zero_lt_of_lt
+            exact hm₅m₂
+          rw [ne_eq, Nat.factorization_eq_zero_iff, eq_true Nat.prime_two, eq_false hl] at h'
+          rw [not_true, false_or, or_false, not_not] at h'
+          exact h'
+        · have h' : l.factorization 5 ≠ 0 := by
+            rw [hk]
+            simp
+          rw [ne_eq, Nat.factorization_eq_zero_iff, eq_true Nat.prime_five, eq_false hl] at h'
+          rw [not_true, false_or, or_false, not_not] at h'
+          exact h'
+      rw [decide_eq_false h, Nat.pow_add_one, mul_comm, ← Nat.div_div_eq_div_mul]
+      rw [ne_eq, not_not, ← Nat.dvd_iff_mod_eq_zero] at h
+      have l_div_ten_ne_zero : l / 10 ≠ 0 := by
+        rw [Nat.div_ne_zero_iff_of_dvd h]
+        exact ⟨hl, by simp⟩
+      have h_factorization_five : (l / 10).factorization 5 + 1 = l.factorization 5 := by
+        rw [show 1 = Nat.factorization 10 5 by native_decide, ← Finsupp.add_apply]
+        rw [← Nat.factorization_mul l_div_ten_ne_zero (show 10 ≠ 0 by simp)]
+        rw [Nat.div_mul_cancel h]
+      have h_factorization_two : (l / 10).factorization 2 + 1 = l.factorization 2 := by
+        rw [show 1 = Nat.factorization 10 2 by native_decide, ← Finsupp.add_apply]
+        rw [← Nat.factorization_mul l_div_ten_ne_zero (show 10 ≠ 0 by simp)]
+        rw [Nat.div_mul_cancel h]
+      refine aux k l_div_ten_ne_zero ?_ ?_
+      · rw [← Nat.add_one_lt_add_one_iff]
+        rw [h_factorization_five, h_factorization_two]
+        exact hm₅m₂
+      · rw [← Nat.add_one_inj, h_factorization_five]
+        exact hk
+  exact aux (l.factorization 5) hl hm₅m₂ (by simp)
+
 /-- If `l ≠ 0` and the factorization of `l` contains the prime factor `2` more often than `5`, then the
 last non-zero digit of the decimal representation of `l` is even. -/
 lemma even_last_non_zero_digit_of_factorization_five_lt_two {l : ℕ} (hl : l ≠ 0)
     (hm₅m₂ : l.factorization 5 < l.factorization 2) :
     ((Nat.digits 10 l).find? (· ≠ 0)).get! % 2 = 0 := by
-  let rec aux (m₅ : ℕ) {l : ℕ} (hl : l ≠ 0) (hm₅m₂ : l.factorization 5 < l.factorization 2)
-      (hm₅ : l.factorization 5 = m₅) : ((Nat.digits 10 l).find? (· ≠ 0)).get! % 2 = 0 := by
-    have hm₂ : l.factorization 2 ≠ 0 := Nat.ne_zero_of_lt hm₅m₂
-    conv at hm₂ =>
-      rw [ne_eq, Nat.factorization_eq_zero_iff]
+  rw [last_nonzero_digit_eq hl hm₅m₂, Nat.mod_mod_of_dvd _ (by simp), ← Nat.dvd_iff_mod_eq_zero]
+  rw [show 10 = 5 * 2 by rfl, mul_pow]
+  apply Nat.dvd_div_of_mul_dvd
+  rw [mul_assoc, ← Nat.pow_add_one]
+  apply Nat.Coprime.mul_dvd_of_dvd_of_dvd
+  · apply Nat.Coprime.pow
+    decide
+  · apply Nat.ordProj_dvd
+  · rw [← Nat.add_one_le_iff] at hm₅m₂
+    apply Nat.pow_dvd_of_le_of_pow_dvd hm₅m₂
+    apply Nat.ordProj_dvd
+
+lemma set_of_digits_subset_solution : {d | ∃ n, lastDigitFac n = d} ⊆ {2, 4, 6, 8} := by
+  intro d ⟨n, hn⟩
+  rw [← Finset.coe_singleton, ← Finset.coe_insert, ← Finset.coe_insert, ← Finset.coe_insert]
+  show d ∈ {d ∈ Finset.range 10 | d ≠ 0 ∧ d % 2 = 0}
+  simp
+  have h : (Nat.digits 10 (n + 2)!).find? (· ≠ 0) = .some d := by
+    rw [← hn, eq_comm]
+    apply Option.some_get!
+    rw [List.find?_isSome]
+    use (Nat.digits 10 (n + 2)!).getLast
+      (by rw [Nat.digits_ne_nil_iff_ne_zero]; exact Nat.factorial_ne_zero (n + 2))
+    simp
+    exact Nat.getLast_digit_ne_zero 10 (Nat.factorial_ne_zero (n + 2))
+  refine ⟨?_, ⟨?_, ?_⟩⟩
+  · apply Nat.digits_lt_base (by simp) (show d ∈ Nat.digits 10 (n + 2)! from ?_)
+    exact List.mem_of_find?_eq_some h
+  · rw [← ne_eq, ← @decide_eq_true_iff (d ≠ 0)]
+    exact @List.find?_some _ (· ≠ 0) _ _ h
+  · rw [← hn]
+    apply even_last_non_zero_digit_of_factorization_five_lt_two
+      (show (n + 2)! ≠ 0 from Nat.factorial_ne_zero (n + 2))
+    exact factorization_factorial_five_lt_two
+
+/-! ### Lemmas for the second part of the problem -/
+
+/-- We can determine the last non-zero digit of `l * n` using only the value of `n` and the last non-zero
+digit of `l`. -/
+lemma last_nonzero_digit_l_mul_n {l n : ℕ} (hl : l ≠ 0) (hm₅m₂ : l.factorization 5 < l.factorization 2)
+    (hn : n % 5 ≠ 0) : ((Nat.digits 10 (l * n)).find? (· ≠ 0)).get! =
+    ((Nat.digits 10 l).find? (· ≠ 0)).get! * (n % 10) % 10 := by
+  have hn' : n ≠ 0 := by
+    by_contra ha
+    rw [ha] at hn
+    simp at hn
+  have hn'' : n.factorization 5 = 0 := by
+    rw [ne_eq, ← Nat.dvd_iff_mod_eq_zero] at hn
+    exact Nat.factorization_eq_zero_of_not_dvd hn
+  have hl' : l * n ≠ 0 := Nat.mul_ne_zero hl hn'
+  have hm₅m₂' : (l * n).factorization 5 < (l * n).factorization 2 := by
+    rw [Nat.factorization_mul hl hn', Finsupp.add_apply, Finsupp.add_apply]
+    apply add_lt_add_of_lt_of_le
+    · exact hm₅m₂
+    · rw [hn'']
       simp
-    have hm₂ : l % 2 = 0 := hm₂.right.left
-    match m₅ with
-    | 0 =>
-      have l_mod_ten_ne_zero : l % 10 ≠ 0 := by
-        conv at hm₅ =>
-          rw [Nat.factorization_eq_zero_iff, eq_true Nat.prime_five, eq_false hl]
-          simp
-        rw [ne_eq, ← Nat.dvd_iff_mod_eq_zero, show 10 = 2 * 5 by rfl]
-        by_contra ha
-        absurd dvd_of_mul_left_dvd ha
-        exact hm₅
-      rw [Nat.digits_def' (by simp) (Nat.zero_lt_of_ne_zero hl), List.find?_cons]
-      rw [decide_eq_true l_mod_ten_ne_zero]
+  have h : (l * n).factorization 5 = l.factorization 5 := by
+    rw [Nat.factorization_mul hl hn', Finsupp.add_apply, hn'']
+    simp
+  rw [last_nonzero_digit_eq hl' hm₅m₂', last_nonzero_digit_eq hl hm₅m₂, h]
+  simp
+  rw [Nat.mul_div_right_comm ?_]
+  rw [show 10 = 2 * 5 by rfl, mul_pow]
+  apply Nat.Coprime.mul_dvd_of_dvd_of_dvd
+  · apply Nat.Coprime.pow
+    decide
+  · apply Nat.pow_dvd_of_le_of_pow_dvd hm₅m₂.le
+    apply Nat.ordProj_dvd
+  · apply Nat.ordProj_dvd
+
+lemma lastDigitFac_succ {n : ℕ} (h : (n + 3) % 5 ≠ 0) : lastDigitFac (n + 1) =
+    lastDigitFac n * ((n + 3) % 10) % 10 := by
+  unfold lastDigitFac
+  rw [add_assoc, show 1 + 2 = 2 + 1 by rfl, ← add_assoc, Nat.factorial_succ, mul_comm]
+  apply last_nonzero_digit_l_mul_n
+  · apply Nat.factorial_ne_zero
+  · exact factorization_factorial_five_lt_two
+  · exact h
+
+lemma n_lt {n k : ℕ} : n < 10 ^ (n + 1) - 6 + k := by
+  apply Nat.lt_add_right k
+  apply Nat.lt_sub_of_add_lt
+  calc
+    _ < 10 * (n + 1) := ?_
+    _ ≤ 10 ^ (n + 1) := ?_
+  · rw [left_distrib]
+    apply add_lt_add_of_le_of_lt
+    · apply Nat.le_mul_of_pos_left
       simp
-      exact hm₂
-    | m₅ + 1 =>
-      have l_mod_ten_eq_zero : ¬l % 10 ≠ 0 := by
-        rw [ne_eq, not_not, ← Nat.dvd_iff_mod_eq_zero, show 10 = 2 * 5 by rfl]
-        apply Nat.Prime.dvd_mul_of_dvd_ne (by simp) Nat.prime_two Nat.prime_five
-        · rw [Nat.dvd_iff_mod_eq_zero]
-          exact hm₂
-        · have hm₅' : l.factorization 5 ≠ 0 := by
-            rw [hm₅]
-            simp
-          conv at hm₅' =>
-            rw [ne_eq, Nat.factorization_eq_zero_iff]
-            simp
-          exact hm₅'.right.left
-      rw [Nat.digits_def' (by simp) (Nat.zero_lt_of_ne_zero hl), List.find?_cons]
-      rw [decide_eq_false l_mod_ten_eq_zero]
-      simp only
-      rw [ne_eq, not_not, ← Nat.dvd_iff_mod_eq_zero] at l_mod_ten_eq_zero
-      have l_div_ten_ne_zero : l / 10 ≠ 0 := by
-        rw [Nat.div_ne_zero_iff_of_dvd l_mod_ten_eq_zero]
-        simp
-        exact hl
-      have m₂_add_one_eq_m₂ : (l / 10).factorization 2 + 1 = l.factorization 2 := by
-        rw [show 1 = Nat.factorization 10 2 by native_decide]
-        rw (config := { occs := .pos [2] }) [← show l / 10 * 10 = l from Nat.div_mul_cancel l_mod_ten_eq_zero]
-        rw [Nat.factorization_mul l_div_ten_ne_zero (by simp)]
-        simp
-      have m₅_add_one_eq_m₅ : (l / 10).factorization 5 + 1 = l.factorization 5 := by
-        rw [show 1 = Nat.factorization 10 5 by native_decide]
-        rw (config := { occs := .pos [2] }) [← show l / 10 * 10 = l from Nat.div_mul_cancel l_mod_ten_eq_zero]
-        rw [Nat.factorization_mul l_div_ten_ne_zero (by simp)]
-        simp
-      refine aux m₅ l_div_ten_ne_zero ?_ ?_
-      · rw [← Nat.add_one_lt_add_one_iff, m₂_add_one_eq_m₂, m₅_add_one_eq_m₅]
-        exact hm₅m₂
-      · rw [← Nat.add_one_inj, ← hm₅]
-        exact m₅_add_one_eq_m₅
-  exact aux (l.factorization 5) hl hm₅m₂ (by simp)
+    · simp
+  · rw [Nat.pow_add_one, mul_comm]
+    apply Nat.mul_le_mul_right
+    rw [Nat.add_one_le_iff]
+    apply Nat.lt_pow_self
+    simp
+
+@[simp]
+lemma six_le_ten_pow {n : ℕ} : 6 ≤ 10 ^ (n + 1) := by
+  rw [Nat.pow_add_one]
+  calc
+    _ ≤ 10 := by simp
+    _ ≤ 10 ^ n * 10 := Nat.le_mul_of_pos_left _ (by simp)
+
+lemma ten_pow_add_mod_five {n k : ℕ} : (10 ^ (n + 1) - 6 + k) % 5 = (4 + k) % 5 := by
+  apply Nat.add_mod_eq_add_mod_right
+  rw [← Nat.add_mod_right, ← Nat.add_mod_right]
+  conv =>
+    lhs
+    left
+    rw [add_assoc, show 5 + 5 = 6 + 4 by rfl, ← add_assoc]
+  rw [Nat.sub_add_cancel ?_]
+  · apply Nat.add_mod_eq_add_mod_right
+    rw [← Nat.dvd_iff_mod_eq_zero, Nat.pow_add_one, show 10 = 2 * 5 by rfl, ← mul_assoc]
+    simp
+  · simp
+
+lemma ten_pow_add_mod_ten {n k : ℕ} : (10 ^ (n + 1) - 6 + k) % 10 = (4 + k) % 10 := by
+  apply Nat.add_mod_eq_add_mod_right
+  rw [← Nat.add_mod_right]
+  conv =>
+    lhs
+    left
+    right
+    rw [show 10 = 6 + 4 by rfl]
+  rw [← add_assoc, Nat.sub_add_cancel ?_]
+  · rw [Nat.add_mod]
+    conv =>
+      lhs
+      left
+      left
+      rw [Nat.mod_eq_zero_of_dvd (by rw [Nat.pow_add_one]; simp)]
+  · simp
+
+/-- The last non-zero digits of `l * 10 ^ k` and `l` are equal. -/
+lemma last_nonzero_digit_mul_ten_pow {l k : ℕ} (hl : l ≠ 0)
+    (hm₅m₂ : l.factorization 5 < l.factorization 2) : ((Nat.digits 10 (l * 10 ^ k)).find? (· ≠ 0)).get! =
+    ((Nat.digits 10 l).find? (· ≠ 0)).get! := by
+  rw [last_nonzero_digit_eq, last_nonzero_digit_eq]
+  · conv =>
+      lhs
+      left
+      right
+      rw [Nat.factorization_mul hl (by simp)]
+      rw (config := { occs := .pos [2] }) [show 10 = 2 * 5 by rfl]
+      rw [mul_pow, Nat.factorization_mul (by simp) (by simp)]
+      simp
+      rw [show Nat.factorization 2 5 = 0 by native_decide]
+      rw [show Nat.factorization 5 5 = 1 by native_decide]
+      simp
+      rw [pow_add, mul_comm]
+    rw [← Nat.div_div_eq_div_mul]
+    simp
+  · exact hl
+  · exact hm₅m₂
+  · simp
+    exact hl
+  · rw [show 10 = 2 * 5 by rfl, mul_pow]
+    rw [Nat.factorization_mul, Nat.factorization_mul]
+    · simp
+      rw [show Nat.factorization 2 5 = 0 by native_decide]
+      rw [show Nat.factorization 5 5 = 1 by native_decide]
+      rw [show Nat.factorization 2 2 = 1 by native_decide]
+      rw [show Nat.factorization 5 2 = 0 by native_decide]
+      simp
+      exact hm₅m₂
+    · simp
+    · simp
+    · exact hl
+    · simp
+
+/-! ### Considering every possible case for finding an occurrence of a digit -/
+
+lemma lastDigitFac_add_one {n : ℕ} : lastDigitFac (10 ^ (n + 1) - 6 + 1) =
+    lastDigitFac (10 ^ (n + 1) - 6) * 7 % 10 := by
+  rw [lastDigitFac_succ ?_, ten_pow_add_mod_ten]
+  rw [ne_eq, ten_pow_add_mod_five]
+  simp
+
+lemma lastDigitFac_add_two {n : ℕ} : lastDigitFac (10 ^ (n + 1) - 6 + 2) =
+    lastDigitFac (10 ^ (n + 1) - 6) * 6 % 10 := by
+  rw [lastDigitFac_succ ?_, lastDigitFac_add_one, add_assoc, ten_pow_add_mod_ten]
+  · simp
+    rw [mul_assoc, Nat.mul_mod]
+    simp
+  · rw [add_assoc, ne_eq, ten_pow_add_mod_five]
+    simp
+
+lemma lastDigitFac_add_three {n : ℕ} : lastDigitFac (10 ^ (n + 1) - 6 + 3) =
+    lastDigitFac (10 ^ (n + 1) - 6) * 4 % 10 := by
+  rw [lastDigitFac_succ ?_, lastDigitFac_add_two, add_assoc, ten_pow_add_mod_ten]
+  · simp
+    rw [mul_assoc, Nat.mul_mod]
+    simp
+  · rw [add_assoc, ne_eq, ten_pow_add_mod_five]
+    simp
+
+lemma lastDigitFac_ten_pow {n : ℕ} : lastDigitFac (10 ^ (n + 1) - 6 + 4) =
+    lastDigitFac (10 ^ (n + 1) - 6 + 3) := by
+  have h : 3 ≤ 10 ^ (n + 1) - 3 := by
+    apply Nat.le_sub_of_add_le
+    simp
+  have h' : 3 ≤ 10 ^ (n + 1) := by
+    calc
+      _ ≤ 10 ^ (n + 1) - 3 := h
+      _ ≤ 10 ^ (n + 1) := by simp
+  rw [show 6 = 3 + 3 by rfl, ← Nat.sub_sub]
+  conv =>
+    lhs
+    rw [← Nat.sub_add_comm h, Nat.add_sub_assoc (by simp)]
+  conv =>
+    rhs
+    rw [← Nat.sub_add_comm h, Nat.add_sub_assoc (by simp)]
+  simp
+  unfold lastDigitFac
+  rw [Nat.factorial_succ, add_assoc, Nat.sub_add_cancel h', mul_comm]
+  apply last_nonzero_digit_mul_ten_pow
+  · apply Nat.factorial_ne_zero
+  · exact factorization_factorial_five_lt_two
+
+lemma lastDigitFac_add_five {n : ℕ} : lastDigitFac (10 ^ (n + 1) - 6 + 5) =
+    lastDigitFac (10 ^ (n + 1) - 6) * 4 % 10 := by
+  rw [lastDigitFac_succ ?_, lastDigitFac_ten_pow, lastDigitFac_add_three, add_assoc, ten_pow_add_mod_ten]
+  · simp
+  · rw [add_assoc, ne_eq, ten_pow_add_mod_five]
+    simp
+
+lemma lastDigitFac_add_six {n : ℕ} : lastDigitFac (10 ^ (n + 1) - 6 + 6) =
+    lastDigitFac (10 ^ (n + 1) - 6) * 8 % 10 := by
+  rw [lastDigitFac_succ ?_, lastDigitFac_add_five, add_assoc, ten_pow_add_mod_ten]
+  · simp
+    rw [mul_assoc, Nat.mul_mod]
+    simp
+  · rw [add_assoc, ne_eq, ten_pow_add_mod_five]
+    simp
+
+lemma exists_with_lastDigitFac_add_zero {n d : ℕ} (h : d = lastDigitFac (10 ^ (n + 1) - 6)) :
+    ∃ m ∈ {m | lastDigitFac m = d}, n < m := by
+  use 10 ^ (n + 1) - 6 + 0
+  refine ⟨?_, n_lt⟩
+  simp
+  rw [h]
+
+lemma exists_with_lastDigitFac_add_one {n d : ℕ} (h : d = lastDigitFac (10 ^ (n + 1) - 6) * 7 % 10) :
+    ∃ m ∈ {m | lastDigitFac m = d}, n < m := by
+  use 10 ^ (n + 1) - 6 + 1
+  refine ⟨?_, n_lt⟩
+  rw [h]
+  exact lastDigitFac_add_one
+
+lemma exists_with_lastDigitFac_add_two {n d : ℕ} (h : d = lastDigitFac (10 ^ (n + 1) - 6) * 6 % 10) :
+    ∃ m ∈ {m | lastDigitFac m = d}, n < m := by
+  use 10 ^ (n + 1) - 6 + 2
+  refine ⟨?_, n_lt⟩
+  rw [h]
+  exact lastDigitFac_add_two
+
+lemma exists_with_lastDigitFac_add_three {n d : ℕ} (h : d = lastDigitFac (10 ^ (n + 1) - 6) * 4 % 10) :
+    ∃ m ∈ {m | lastDigitFac m = d}, n < m := by
+  use 10 ^ (n + 1) - 6 + 3
+  refine ⟨?_, n_lt⟩
+  rw [h]
+  exact lastDigitFac_add_three
+
+lemma exists_with_lastDigitFac_add_six {n d : ℕ} (h : d = lastDigitFac (10 ^ (n + 1) - 6) * 8 % 10) :
+    ∃ m ∈ {m | lastDigitFac m = d}, n < m := by
+  use 10 ^ (n + 1) - 6 + 6
+  refine ⟨?_, n_lt⟩
+  rw [h]
+  exact lastDigitFac_add_six
+
+/-- For every digit `d ∈ {2, 4, 6, 8}` any `n : ℕ`, we can find an `m : ℕ` with `n < m` such that
+`lastDigitFac m = d`, thus proving that each of these digits appears infinitely often in
+`lastDigitFac`. -/
+lemma exists_with_lastDigitFac_eq {d n : ℕ} (hd : d ∈ ({2, 4, 6, 8} : Set ℕ)) :
+    ∃ m ∈ {m | lastDigitFac m = d}, n < m := by
+  have h : lastDigitFac (10 ^ (n + 1) - 6) ∈ ({2, 4, 6, 8} : Set ℕ) := by
+    apply Set.mem_of_subset_of_mem set_of_digits_subset_solution
+    simp
+  obtain hd | hd | hd | hd := hd
+  · rw [hd]
+    obtain h | h | h | h := h
+    · apply exists_with_lastDigitFac_add_zero
+      rw [h]
+    · apply exists_with_lastDigitFac_add_six
+      rw [h]
+    · apply exists_with_lastDigitFac_add_one
+      rw [h]
+    · apply exists_with_lastDigitFac_add_three
+      rw [h]
+  · rw [hd]
+    obtain h | h | h | h := h
+    · apply exists_with_lastDigitFac_add_one
+      rw [h]
+    · apply exists_with_lastDigitFac_add_zero
+      rw [h]
+    · apply exists_with_lastDigitFac_add_three
+      rw [h]
+    · apply exists_with_lastDigitFac_add_six
+      rw [h]
+  · rw [hd]
+    obtain h | h | h | h := h
+    · apply exists_with_lastDigitFac_add_six
+      rw [h]
+    · apply exists_with_lastDigitFac_add_three
+      rw [h]
+    · apply exists_with_lastDigitFac_add_two
+      rw [h]
+    · apply exists_with_lastDigitFac_add_one
+      rw [h]
+  · rw [hd]
+    obtain h | h | h | h := h
+    · apply exists_with_lastDigitFac_add_three
+      rw [h]
+    · apply exists_with_lastDigitFac_add_one
+      rw [h]
+    · apply exists_with_lastDigitFac_add_six
+      rw [h]
+    · apply exists_with_lastDigitFac_add_zero
+      rw [h]
 
 end Proof
 
@@ -560,29 +881,11 @@ theorem proof : solution = {d | ∃ n, lastDigitFac n = d} ∧
       apply Set.insert_subset (by use 2; native_decide)
       apply Set.insert_subset (by use 1; native_decide)
       rw [Set.singleton_subset_iff]; use 7; native_decide
-    · intro d ⟨n, hn⟩
-      unfold solution
-      rw [← Finset.coe_singleton, ← Finset.coe_insert, ← Finset.coe_insert, ← Finset.coe_insert]
-      show d ∈ {d ∈ Finset.range 10 | d ≠ 0 ∧ d % 2 = 0}
-      simp
-      have bla : (Nat.digits 10 (n + 2)!).find? (· ≠ 0) = .some d := by
-        rw [← hn, eq_comm]
-        apply Option.some_get!
-        rw [List.find?_isSome]
-        use (Nat.digits 10 (n + 2)!).getLast
-          (by rw [Nat.digits_ne_nil_iff_ne_zero]; exact Nat.factorial_ne_zero (n + 2))
-        simp
-        exact Nat.getLast_digit_ne_zero 10 (Nat.factorial_ne_zero (n + 2))
-      refine ⟨?_, ⟨?_, ?_⟩⟩
-      · apply Nat.digits_lt_base (by simp) (show d ∈ Nat.digits 10 (n + 2)! from ?_)
-        exact List.mem_of_find?_eq_some bla
-      · rw [← ne_eq, ← @decide_eq_true_iff (d ≠ 0)]
-        exact @List.find?_some _ (· ≠ 0) _ _ bla
-      · rw [← hn]
-        apply even_last_non_zero_digit_of_factorization_five_lt_two
-          (show (n + 2)! ≠ 0 from Nat.factorial_ne_zero (n + 2))
-        exact factorization_factorial_five_lt_two
-  · sorry
+    · exact set_of_digits_subset_solution
+  · intros d hd
+    apply Set.infinite_of_forall_exists_gt
+    intro n
+    exact exists_with_lastDigitFac_eq hd
 
 end Result
 
